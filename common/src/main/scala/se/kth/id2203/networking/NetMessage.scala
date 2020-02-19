@@ -54,6 +54,10 @@ final case class NetHeader(src: NetAddress, dst: NetAddress, proto: Transport)
   override def getSource(): NetAddress = src;
 }
 
+// Meaning of square brackets: NetMessage can be instantiated with variable payload type C
+//    https://stackoverflow.com/questions/32881091/what-is-the-use-of-these-brackets-in-case-class-before-parameter-list-in-scal
+// Meaning of "<:": payload C has to be a child/subtype of KompicsEvent
+//    https://stackoverflow.com/questions/6828875/what-does-mean-in-scala
 @SerialVersionUID(6650033691019681053L)
 final case class NetMessage[C <: KompicsEvent](header: NetHeader, payload: C)
     extends Msg[NetAddress, NetHeader]
