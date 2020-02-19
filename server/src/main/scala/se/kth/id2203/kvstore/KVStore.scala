@@ -28,6 +28,8 @@ import se.kth.id2203.overlay.Routing;
 import se.sics.kompics.sl._;
 import se.sics.kompics.network.Network;
 
+import scala.collection.mutable;
+
 class KVService extends ComponentDefinition {
 
   //******* Ports ******
@@ -35,11 +37,45 @@ class KVService extends ComponentDefinition {
   val route = requires(Routing);
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
+
+  // Storage
+  var hashmap = mutable.HashMap.empty[String, String];
+
   //******* Handlers ******
   net uponEvent {
     case NetMessage(header, op: Op) => {
-      log.info("Got operation {}! Now implement me please :)", op);
-      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
+      // log.info("Got operation {}! Now implement me please :)", op);
+      // trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
+      var result = op.request match {
+        case "GET" => get(op.key);
+        case "PUT" => put(op.key, op.value);
+        case "CAS" => cas(op.key, op.value);
+      }
     }
   }
+
+  def get(key: String) {
+    // Nothing yet
+    hashmap.get(key);
+    for  (elem <- hashmap) {
+      println(elem);
+    }
+  }
+
+  def put(key: String, value: Option[String]) {
+    // Nothing yet
+    hashmap += ((key, value.get));
+    for (elem <- hashmap) {
+      println(elem);
+    }
+  }
+
+  def cas(key: String, newValue: Option[String]) {
+    // Nothing yet
+    // what is this for even?
+  }
+}
+
+case object KVStore {
+
 }

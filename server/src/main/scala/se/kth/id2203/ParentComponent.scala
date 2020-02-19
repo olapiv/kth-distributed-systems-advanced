@@ -54,5 +54,9 @@ class ParentComponent extends ComponentDefinition {
     // KV
     connect(Routing)(overlay -> kv);
     connect[Network](net -> kv);
+
+    // add BEB
+    // add RB
+    // add replica
   }
 }

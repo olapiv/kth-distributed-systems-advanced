@@ -40,6 +40,21 @@ class LookupTable extends NodeAssignment with Serializable {
       case None    => partitions.lastKey
     }
     return partitions(partition);
+
+// ------------------------ 
+
+    // val keyVal = key.toInt;
+    // var targetKey = 0;
+    // for (key <- partition.keySet) {
+    //   // ????
+    //   if (keyVal > keyVal && keyVal <=(key + 1000)) {
+    //     targetKey = key;
+    //   }
+    //   partitions(targetKey);
+    // }
+
+
+
   }
 
   def getNodes(): Set[NetAddress] = partitions.foldLeft(Set.empty[NetAddress]) {
@@ -56,10 +71,55 @@ class LookupTable extends NodeAssignment with Serializable {
 
 }
 
+// object LookupTable {
+//   // def generate(nodes: Set[NetAddress]): LookupTable = {
+//     // val lut = new LookupTable();
+//     // lut.partitions ++= (0 -> nodes);
+
+//   def generate(nodes: Set[NetAddress], replicationDegree: Int): LookupTable = {
+//     var keyRange = 1000;
+//     if (nodes.size < replicationDegree) {
+//       generate(nodes, replicationDegree);
+//     }
+
+//     var lut = new LookupTable();
+    
+//     val replicationGroupNum = nodes.size / replicationDegree;
+//     val keyspace = keyRange / replicationGroupNum;
+
+//     for (node <- nodes) {
+//       var group: List[NetAddress] = List.empty[NetAddress];
+//       var memberNumber = 0;
+
+//       while (memberNumber < replicationDegree) {
+//         memberNumber += 1;
+//         group +:= node;
+//       }
+
+//       if (group.length == replicationDegree) {
+//         lut.partitions ++= (keyRange -> group);
+//         keyRange += 1000;
+//       }
+//     }
+//     lut
+//   }
+// }
+
 object LookupTable {
-  def generate(nodes: Set[NetAddress]): LookupTable = {
-    val lut = new LookupTable();
-    lut.partitions ++= (0 -> nodes);
+  def generate(nodes: Set[NetAddress], replicationDegree: Int): LookupTable = {
+    var groupSize = nodes.size / replicationDegree;
+    var space = (Integer.MAX_VALUE - Integer.MIN_VALUE)/replicationDegree;
+    var nodeList = nodes.toList;
+    var startPoint = 0;
+    var lut = new LookupTable;
+
+    for (i <- 0 to replicationDegree) {
+      var tempGroup = List.empty[NetAddress];
+      for (j <- startPoint to (startPoint + groupSize)) {
+        lut.partitions += ((Integer.MIN_VALUE + i*space) -> nodeList(j))
+      }
+      startPoint += groupSize;
+    }
     lut
   }
 }

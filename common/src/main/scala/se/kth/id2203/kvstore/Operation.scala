@@ -29,10 +29,17 @@ import se.sics.kompics.KompicsEvent;
 trait Operation extends KompicsEvent {
   def id: UUID;
   def key: String;
+
+  // extend here?
+  def request: String;
+  def value: Option[String];
+  def newValue: Option[String];
 }
 
 @SerialVersionUID(-374812437823538710L)
-case class Op(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
+// case class Op(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
+// case class Op(key: String, id: UUID = UUID.randomUUID(), request: String, value: Option[String]=None, newValue: Option[String]=None) extends Operation with Serializable {
+case class Op(key: String, id: UUID = UUID.randomUUID(), request: String, value: Option[String]=None) extends Operation with Serializable {
   def response(status: OpCode.OpCode): OpResponse = OpResponse(id, status);
 }
 
