@@ -1,0 +1,9 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="All" type="CompoundRunConfigurationType">
+    <toRun name="Client" type="JarApplication" />
+    <toRun name="Server 1" type="JarApplication" />
+    <toRun name="Server 2" type="JarApplication" />
+    <toRun name="Bootstrap Server" type="JarApplication" />
+    <method v="2" />
+  </configuration>
+</component>

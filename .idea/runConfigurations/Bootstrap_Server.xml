@@ -1,0 +1,8 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Bootstrap Server" type="JarApplication">
+    <option name="JAR_PATH" value="$PROJECT_DIR$/server/target/scala-2.13/server.jar" />
+    <option name="PROGRAM_PARAMETERS" value="-p 45678" />
+    <option name="ALTERNATIVE_JRE_PATH" />
+    <method v="2" />
+  </configuration>
+</component>
