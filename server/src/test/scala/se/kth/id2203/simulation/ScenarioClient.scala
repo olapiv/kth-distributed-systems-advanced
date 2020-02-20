@@ -44,27 +44,27 @@ class ScenarioClient extends ComponentDefinition {
   val server = cfg.getValue[NetAddress]("id2203.project.bootstrap-address");
   private val pending = mutable.Map.empty[UUID, String];
   //******* Handlers ******
-  ctrl uponEvent {
-    case _: Start => {
-      val messages = SimulationResult[Int]("messages");
-      for (i <- 0 to messages) {
-        val op = new Op(s"test$i");
-        val routeMsg = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
-        trigger(NetMessage(self, server, routeMsg) -> net);
-        pending += (op.id -> op.key);
-        logger.info("Sending {}", op);
-        SimulationResult += (op.key -> "Sent");
-      }
-    }
-  }
-
-  net uponEvent {
-    case NetMessage(header, or @ OpResponse(id, status)) => {
-      logger.debug(s"Got OpResponse: $or");
-      pending.remove(id) match {
-        case Some(key) => SimulationResult += (key -> status.toString());
-        case None      => logger.warn("ID $id was not pending! Ignoring response.");
-      }
-    }
-  }
+//  ctrl uponEvent {
+//    case _: Start => {
+//      val messages = SimulationResult[Int]("messages");
+//      for (i <- 0 to messages) {
+//        val op = new Op(s"test$i");
+//        val routeMsg = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
+//        trigger(NetMessage(self, server, routeMsg) -> net);
+//        pending += (op.id -> op.key);
+//        logger.info("Sending {}", op);
+//        SimulationResult += (op.key -> "Sent");
+//      }
+//    }
+//  }
+//
+//  net uponEvent {
+//    case NetMessage(header, or @ OpResponse(id, status)) => {
+//      logger.debug(s"Got OpResponse: $or");
+//      pending.remove(id) match {
+//        case Some(key) => SimulationResult += (key -> status.toString());
+//        case None      => logger.warn("ID $id was not pending! Ignoring response.");
+//      }
+//    }
+//  }
 }
