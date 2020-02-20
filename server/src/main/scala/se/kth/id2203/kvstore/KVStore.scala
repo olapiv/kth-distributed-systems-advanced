@@ -23,23 +23,51 @@
  */
 package se.kth.id2203.kvstore;
 
-import se.kth.id2203.networking._;
-import se.kth.id2203.overlay.Routing;
-import se.sics.kompics.sl._;
-import se.sics.kompics.network.Network;
+import java.util.UUID
+
+import se.kth.id2203.networking._
+import se.kth.id2203.overlay.Routing
+import se.sics.kompics.sl._
+import se.sics.kompics.network.Network
+
+import scala.collection.mutable
+import scala.concurrent.Promise;
 
 class KVService extends ComponentDefinition {
 
   //******* Ports ******
   val net = requires[Network];
   val route = requires(Routing);
+  val consensus = requires[Consensus]
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
+  private val keyValueMap = mutable.SortedMap.empty[Int, Any];
+  private val pending = mutable.SortedMap.empty[UUID, NetAddress];
   //******* Handlers ******
   net uponEvent {
-    case NetMessage(header, op: Operation) => {
-      log.info("Got operation {}! Header: {}; Now implement me please :)", op, header);
-      trigger(NetMessage(self, header.src, OpResponse(op.id, OpCode.NotImplemented, 0)) -> net);
+    case NetMessage(NetHeader(src, _, _), get: GetOp) => {
+      log.info("Got GET operation {}! Header: {};", get, header);
+      trigger(NetMessage(self, header.src, OpResponse(get.id, OpCode.NotImplemented, 0)) -> net);
+    }
+
+    case NetMessage(NetHeader(src, _, _), put: PutOp) => {
+      log.info("Got PUT operation {}! Header: {};", put, header);
+      trigger(Propose(put.key, (put.id, put.value)) -> consensus);
+      pending += ((put.id, src));
+    }
+
+    case NetMessage(NetHeader(src, _, _), cas: CasOp) => {
+      log.info("Got CAS operation {}! Header: {};", cas, header);
+      trigger(NetMessage(self, header.src, OpResponse(cas.id, OpCode.NotImplemented, 0)) -> net);
+    }
+  }
+
+  consensus uponEvent {
+    case Decide(key: Int, value: (UUID, Any)) => {
+      keyValueMap(key) = value._2;
+      if (pending.contains(value._1)) {
+        trigger(NetMessage(self, pending(value._1), OpResponse(value._1, OpCode.Ok, value)) -> net);
+      }
     }
   }
 }
