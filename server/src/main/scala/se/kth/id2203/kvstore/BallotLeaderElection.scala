@@ -108,7 +108,7 @@ class GossipLeaderElection(init: Init[GossipLeaderElection]) extends ComponentDe
     }
     case NetMessage(src, HeartbeatResp(r, b)) => {
       if (r == round) {
-        ballots += ((src, b));
+        ballots += ((src.src, b));
       } else {
         period += delta;
       }

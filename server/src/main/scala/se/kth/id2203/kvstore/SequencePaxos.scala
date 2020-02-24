@@ -124,8 +124,8 @@ class SequencePaxos extends ComponentDefinition {
     }
     case NetMessage(a, Promise(n, na, sfxa, lda)) => {
       if ((n == nL) && (state == (LEADER, PREPARE))) {
-        acks += ((a, (na, sfxa)));
-        lds += ((a, lda));
+        acks += ((a.src, (na, sfxa)));
+        lds += ((a.src, lda));
         if (acks.size == majority) {
           val (k, sfx) = maximum(acks);
           va = prefix(va, ld) ++ sfx ++ propCmds;
@@ -138,7 +138,7 @@ class SequencePaxos extends ComponentDefinition {
           }
         }
       } else if ((n == nL) && (state == (LEADER, ACCEPT))) {
-        lds += ((a, lda));
+        lds += ((a.src, lda));
         val sfx = suffix(va, lds(a.src));
         //val sfx = suffix(va, lds(a));
         trigger(NetMessage(self, a.src, AcceptSync(nL, sfx, lds(a.src))) -> pl);

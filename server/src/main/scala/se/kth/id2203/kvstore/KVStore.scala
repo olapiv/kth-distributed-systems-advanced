@@ -41,7 +41,7 @@ class KVService extends ComponentDefinition {
   val consensus = requires[SequenceConsensus]
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
-  private val keyValueMap = mutable.Map.empty[Int, Any];
+  private val keyValueMap = mutable.Map.empty[String, Any];
 
   //******* Handlers ******
   net uponEvent {
