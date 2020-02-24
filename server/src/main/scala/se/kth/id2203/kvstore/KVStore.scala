@@ -21,68 +21,61 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package se.kth.id2203.kvstore;
+package se.kth.id2203.kvstore
 
-import java.util.UUID
+;
 
+import se.kth.id2203.kompicsevents.{SC_Decide, SC_Propose}
 import se.kth.id2203.networking._
 import se.kth.id2203.overlay.Routing
-import se.sics.kompics.sl._
+import se.kth.id2203.sequencepaxos.SequenceConsensus
 import se.sics.kompics.network.Network
+import se.sics.kompics.sl._
 
-import scala.collection.mutable
-import scala.concurrent.Promise;
+import scala.collection.mutable;
 
 class KVService extends ComponentDefinition {
 
   //******* Ports ******
-  val net = requires[Network];
-  val route = requires(Routing);
-  val consensus = requires[SequenceConsensus]
+  val net: PositivePort[Network] = requires[Network];
+  val route: PositivePort[Routing.type] = requires(Routing);
+  val sc: PositivePort[SequenceConsensus] = requires[SequenceConsensus];
   //******* Fields ******
-  val self = cfg.getValue[NetAddress]("id2203.project.address");
-  private val keyValueMap = mutable.Map.empty[String, Any];
+  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
+
+  // members
+  val store = mutable.Map.empty[String, String]
+
+  for (i <- 0 to 10) {
+    store += ((i.toString, (10 - i).toString))
+  }
 
   //******* Handlers ******
   net uponEvent {
-    case NetMessage(NetHeader(src, _, _), get: GetOp) => {
-      log.info("Got GET operation {}!", get);
-      trigger(SC_Propose(get) -> consensus)
-    }
-
-    case NetMessage(NetHeader(src, _, _), put: PutOp) => {
-      log.info("Got PUT operation {}!", put);
-      trigger(SC_Propose(put) -> consensus)
-    }
-
-    case NetMessage(NetHeader(src, _, _), cas: CasOp) => {
-      log.info("Got CAS operation {}!", cas);
-      trigger(SC_Propose(cas) -> consensus)
+    case NetMessage(header, op: Op) => handle {
+      trigger(SC_Propose(op) -> sc);
     }
   }
 
-  consensus uponEvent {
-    case SC_Decide(get: GetOp) => {
-      log.info("Done GET operation", get)
-      if (keyValueMap.contains(get.key)) {
-        trigger(NetMessage(self, get.src, OpResponse(get.id, OpCode.Ok, keyValueMap(get.key))) -> net)
-      } else {
-        trigger(NetMessage(self, get.src, OpResponse(get.id, OpCode.Ok, None)) -> net)
-      }
+  sc uponEvent {
+    case SC_Decide(get: Get) => handle {
+      println(s"Performed GET operation $get");
+      val result = if (store contains get.key) Some(store(get.key)) else None
+      trigger(NetMessage(self, get.source, get.response(OpCode.Ok, result)) -> net);
     }
-    case SC_Decide(put: PutOp) => {
-      log.info("Done PUT operation", put)
-      keyValueMap += ((put.key, put.value))
-      trigger(NetMessage(self, put.src, OpResponse(put.id, OpCode.Ok, put.value)) -> net)
+    case SC_Decide(put: Put) => handle {
+      println(s"Performed PUT operation $put");
+      store += ((put.key, put.value))
+      trigger(NetMessage(self, put.source, put.response(OpCode.Ok, Some(put.value))) -> net);
     }
-    case SC_Decide(cas: CasOp) => {
-      log.info("Done CAS operation", cas)
-      if (keyValueMap.contains(cas.key)) {
-        if (keyValueMap(cas.key).equals(cas.referenceValue)) {
-          keyValueMap(cas.key) = cas.value
-        }
-      }
-      trigger(NetMessage(self, cas.src, OpResponse(cas.id, OpCode.Ok, cas.value)) -> net)
+    case SC_Decide(cas: Cas) => handle {
+      println(s"Performed CAS operation $cas");
+      val storedValue: Option[String] =
+        if (store.get(cas.key).isDefined) Some(store(cas.key))
+        else None
+      if (storedValue.isDefined && storedValue.get == cas.oldValue) store += ((cas.key, cas.newValue))
+      trigger(NetMessage(self, cas.source, cas.response(OpCode.Ok, storedValue)) -> net)
+
     }
   }
 }

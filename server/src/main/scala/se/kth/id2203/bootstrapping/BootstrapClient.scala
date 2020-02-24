@@ -21,22 +21,29 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package se.kth.id2203.bootstrapping;
+package se.kth.id2203.bootstrapping
 
-import java.util.UUID;
-import se.kth.id2203.networking._;
-import se.sics.kompics.sl._;
-import se.sics.kompics.Start;
-import se.sics.kompics.network.Network;
+;
+
+import java.util.UUID
+
+import se.kth.id2203.networking._
+import se.sics.kompics.Start
+import se.sics.kompics.network.Network
+import se.sics.kompics.sl._
 import se.sics.kompics.timer._;
 
 object BootstrapClient {
+
   sealed trait State;
+
   case object Waiting extends State;
+
   case object Started extends State;
 }
 
 class BootstrapClient extends ComponentDefinition {
+
   import BootstrapClient._;
 
   //******* Ports ******
@@ -53,8 +60,8 @@ class BootstrapClient extends ComponentDefinition {
 
   //******* Handlers ******
   ctrl uponEvent {
-    case _: Start => {
-      log.debug("Starting bootstrap client on {}", self);
+    case _: Start => handle {
+      println(s"Starting bootstrap client on $self");
       val timeout: Long = cfg.getValue[Long]("id2203.project.keepAlivePeriod");
       val spt = new SchedulePeriodicTimeout(timeout, timeout);
       spt.setTimeoutEvent(BSTimeout(spt));
@@ -64,7 +71,7 @@ class BootstrapClient extends ComponentDefinition {
   }
 
   timer uponEvent {
-    case BSTimeout(_) => {
+    case BSTimeout(_) => handle {
       state match {
         case Waiting => {
           trigger(NetMessage(self, server, CheckIn) -> net);
@@ -78,14 +85,14 @@ class BootstrapClient extends ComponentDefinition {
   }
 
   net uponEvent {
-    case NetMessage(header, Boot(assignment)) => {
+    case NetMessage(header, Boot(assignment)) => handle {
       state match {
         case Waiting => {
           log.info("{} Booting up.", self);
           trigger(Booted(assignment) -> bootstrap);
           timeoutId match {
             case Some(tid) => trigger(new CancelPeriodicTimeout(tid) -> timer);
-            case None      => // nothing to cancel
+            case None => // nothing to cancel
           }
           trigger(NetMessage(self, server, Ready) -> net);
           state = Started;
@@ -98,7 +105,7 @@ class BootstrapClient extends ComponentDefinition {
   override def tearDown(): Unit = {
     timeoutId match {
       case Some(tid) => trigger(new CancelPeriodicTimeout(tid) -> timer);
-      case None      => // nothing to cancel
+      case None => // nothing to cancel
     }
   }
 }

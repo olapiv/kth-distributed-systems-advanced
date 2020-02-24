@@ -21,27 +21,33 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package se.kth.id2203.client
+package se.kth.id2203.simulation
 
-;
-
-import se.kth.id2203.kvstore.ClientService
+import se.kth.id2203.kvstore._
 import se.kth.id2203.networking._
-import se.sics.kompics.Init
-import se.sics.kompics.network.Network
-import se.sics.kompics.network.netty._
+import se.kth.id2203.overlay.RouteMsg
 import se.sics.kompics.sl._
+import se.sics.kompics.Start
+import se.sics.kompics.network.Network
 import se.sics.kompics.timer.Timer
-import se.sics.kompics.timer.java.JavaTimer;
+import se.sics.kompics.sl.simulator.SimulationResult
 
-class ParentComponent extends ComponentDefinition {
+class Lin2TestClient extends ComponentDefinition {
 
-  val self = cfg.getValue[NetAddress]("id2203.project.address");
-  val timer = create(classOf[JavaTimer], Init.NONE);
-  val net = create(classOf[NettyNetwork], new NettyInit(self));
-  val client = create(classOf[ClientService], Init.NONE);
-
-  connect[Timer](timer -> client);
-  connect[Network](net -> client);
-
+  //******* Ports ******
+  val net: PositivePort[Network] = requires[Network]
+  val timer: PositivePort[Timer] = requires[Timer]
+  //******* Fields ******
+  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
+  val server: NetAddress = cfg.getValue[NetAddress]("id2203.project.bootstrap-address")
+  val value: Int = SimulationResult[String]("debugCode8").toInt
+  var state = 0
+  //******* Handlers ******
+  ctrl uponEvent {
+    case _: Start => handle {
+      val cas = Cas(value.toString, "0", "400", self)
+      val putMsg = RouteMsg(cas.key, cas)
+      trigger(NetMessage(self, server, putMsg) -> net)
+    }
+  }
 }

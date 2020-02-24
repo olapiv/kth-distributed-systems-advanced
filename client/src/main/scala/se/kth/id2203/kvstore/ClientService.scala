@@ -28,11 +28,11 @@ import se.kth.id2203.networking._;
 
 import se.kth.id2203.overlay._;
 import se.sics.kompics.sl._;
-import se.sics.kompics.{Kompics, KompicsEvent, Start};
+import se.sics.kompics.{ Start, Kompics, KompicsEvent };
 import se.sics.kompics.network.Network;
 import se.sics.kompics.timer._;
 import collection.mutable;
-import concurrent.{Future, Promise};
+import concurrent.{ Promise, Future };
 
 case class ConnectTimeout(spt: ScheduleTimeout) extends Timeout(spt);
 case class OpWithPromise(op: Operation, promise: Promise[OpResponse] = Promise()) extends KompicsEvent;
@@ -51,12 +51,12 @@ class ClientService extends ComponentDefinition {
 
   //******* Handlers ******
   ctrl uponEvent {
-    case _: Start => {
+    case _: Start => handle {
       log.debug(s"Starting client on $self. Waiting to connect...");
-      val timeout: Long = (cfg.getValue[Long]("id2203.project.keepAlivePeriod") * 2L);
-      val st = new ScheduleTimeout(timeout);
+      val timeout: Long = (cfg.getValue[Long]("id2203.project.keepAlivePeriod") * 2l);
+      val st: ScheduleTimeout = new ScheduleTimeout(timeout);
       st.setTimeoutEvent(ConnectTimeout(st));
-      trigger(st -> timer);
+      trigger (st -> timer);
       timeoutId = Some(st.getTimeoutEvent().getTimeoutId());
       trigger(NetMessage(self, server, Connect(timeoutId.get)) -> net);
       trigger(st -> timer);
@@ -64,7 +64,7 @@ class ClientService extends ComponentDefinition {
   }
 
   net uponEvent {
-    case NetMessage(header, ack @ ConnectAck(id, clusterSize)) => {
+    case NetMessage(header, ack @ ConnectAck(id, clusterSize)) => handle {
       log.info(s"Client connected to $server, cluster size is $clusterSize");
       if (id != timeoutId.get) {
         log.error("Received wrong response id! System may be inconsistent. Shutting down...");
@@ -75,17 +75,17 @@ class ClientService extends ComponentDefinition {
       val tc = new Thread(c);
       tc.start();
     }
-    case NetMessage(header, or @ OpResponse(id, status, value)) => {
+    case NetMessage(header, or @ OpResponse(id, status, value)) => handle {
       log.debug(s"Got OpResponse: $or");
       pending.remove(id) match {
         case Some(promise) => promise.success(or);
-        case None          => log.warn(s"ID $id was not pending! Ignoring response.");
+        case None          => None;        // ignore unknown replies
       }
     }
   }
 
   timer uponEvent {
-    case ConnectTimeout(_) => {
+    case ConnectTimeout(_) => handle {
       connected match {
         case Some(ack) => // already connected
         case None => {
@@ -97,16 +97,34 @@ class ClientService extends ComponentDefinition {
   }
 
   loopbck uponEvent {
-    case OpWithPromise(op, promise) => {
+    case OpWithPromise(op, promise) => handle {
       val rm = RouteMsg(op.key, op); // don't know which partition is responsible, so ask the bootstrap server to forward it
       trigger(NetMessage(self, server, rm) -> net);
       pending += (op.id -> promise);
     }
   }
 
-  def op(op: Operation): Future[OpResponse] = {
-      val owf = OpWithPromise(op);
-      trigger(owf -> onSelf);  // gets received by LoopbackPort (loopbck)
-      owf.promise.future
+  def get(key: String): Future[OpResponse] = {
+    val owf = OpWithPromise(Get(key, self));
+    trigger(owf -> onSelf);
+    owf.promise.future
+  }
+
+  def put(key: String, value: String): Future[OpResponse] = {
+    val owf = OpWithPromise(Put(key, value, self));
+    trigger(owf -> onSelf);
+    owf.promise.future
+  }
+
+  def cas(key: String, oldValue: String, newValue: String): Future[OpResponse] = {
+    val owf = OpWithPromise(Cas(key, oldValue, newValue, self));
+    trigger(owf -> onSelf);
+    owf.promise.future
+  }
+
+  def debug(debugCodeId: String): Future[OpResponse] = {
+    val owf = OpWithPromise(Debug(debugCodeId, self));
+    trigger(owf -> onSelf);
+    owf.promise.future
   }
 }

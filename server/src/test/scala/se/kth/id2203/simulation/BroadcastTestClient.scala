@@ -21,27 +21,46 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package se.kth.id2203.client
+package se.kth.id2203.simulation
 
-;
+import java.util.concurrent.atomic.AtomicInteger
 
-import se.kth.id2203.kvstore.ClientService
+import se.kth.id2203.kompicsevents.BEB_Deliver
+import se.kth.id2203.kvstore._
 import se.kth.id2203.networking._
-import se.sics.kompics.Init
+import se.kth.id2203.overlay.RouteMsg
+import se.sics.kompics.Start
 import se.sics.kompics.network.Network
-import se.sics.kompics.network.netty._
 import se.sics.kompics.sl._
+import se.sics.kompics.sl.simulator.SimulationResult
 import se.sics.kompics.timer.Timer
-import se.sics.kompics.timer.java.JavaTimer;
 
-class ParentComponent extends ComponentDefinition {
+class BroadcastTestClient extends ComponentDefinition {
 
-  val self = cfg.getValue[NetAddress]("id2203.project.address");
-  val timer = create(classOf[JavaTimer], Init.NONE);
-  val net = create(classOf[NettyNetwork], new NettyInit(self));
-  val client = create(classOf[ClientService], Init.NONE);
+  //******* Ports ******
+  val net: PositivePort[Network] = requires[Network]
+  val timer: PositivePort[Timer] = requires[Timer]
+  //******* Fields ******
+  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
+  val server: NetAddress = cfg.getValue[NetAddress]("id2203.project.bootstrap-address")
 
-  connect[Timer](timer -> client);
-  connect[Network](net -> client);
+  private val debugCode = "debugCode3"
+  val debugCodeValue = SimulationResult[String](this.debugCode)
+  private val counter = new AtomicInteger(1)
 
+  //******* Handlers ******
+  ctrl uponEvent {
+    case _: Start => handle {
+      val op = Debug(debugCodeValue, self)
+      val routeMsg = RouteMsg(op.key, op)
+      trigger(NetMessage(self, server, routeMsg) -> net)
+    }
+  }
+
+  net uponEvent {
+    case NetMessage(header, BEB_Deliver(receiver, Debug(msg,_,_)))
+      if receiver == self && debugCodeValue == msg => handle {
+      SimulationResult += (debugCode + counter.getAndIncrement() -> ("BroadcastReply"+header.src))
+    }
+  }
 }
