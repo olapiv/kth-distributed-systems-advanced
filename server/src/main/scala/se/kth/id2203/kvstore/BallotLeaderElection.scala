@@ -1,44 +1,49 @@
 package se.kth.id2203.kvstore
 
 import se.kth.id2203.networking.{NetAddress, NetMessage}
+import se.sics.kompics.Start
 import se.sics.kompics.network._
 import se.sics.kompics.sl._
 import se.sics.kompics.timer.{ScheduleTimeout, Timeout, Timer}
-import se.sics.kompics.{KompicsEvent, Start}
 
 import scala.collection.mutable;
+
+case class HeartbeatReq(round: Long, highestBallot: Long) extends KompicsEvent;
+case class HeartbeatResp(round: Long, ballot: Long) extends KompicsEvent;
+case class StartElection(nodes: Set[NetAddress]) extends KompicsEvent;
+case class BLE_Leader(leader: NetAddress, ballot: Long) extends KompicsEvent;
+case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout);
 
 class BallotLeaderElection extends Port {
   indication[BLE_Leader];
 }
 
-case class StartElection(nodes: Set[NetAddress]) extends KompicsEvent
-case class BLE_Leader(leader: NetAddress, ballot: Long) extends KompicsEvent;
-
-case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout);
-case class HeartbeatReq(round: Long, highestBallot: Long) extends KompicsEvent;
-case class HeartbeatResp(round: Long, ballot: Long) extends KompicsEvent;
-
 class GossipLeaderElection extends ComponentDefinition {
 
   val ble = provides[BallotLeaderElection];
   val pl: PositivePort[Network] = requires[Network];
-  val timer = requires[Timer];
+  val timer: PositivePort[Timer] = requires[Timer];
 
-  private val ballotOne = 0x0100000000l;
-  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
-  var topology: Set[NetAddress] = Set.empty;
-  val delta = cfg.getValue[Long]("id2203.project.leaderElectionInterval");
-  var majority = 0;
-
-  private var period = delta;
+  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
+  val delta: Long = cfg.getValue[Long]("id2203.project.leaderElectionInterval");
   private val ballots = mutable.Map.empty[NetAddress, Long];
-
+  private val ballotOne = 0x0100000000l;
+  var topology: Set[NetAddress] = Set.empty;
+  var majority = 0;
+  private var period = delta;
   private var round = 0l;
   private var ballot = ballotFromNAddress(0, self);
-
   private var leader: Option[(Long, NetAddress)] = None;
   private var highestBallot: Long = ballot;
+
+  def ballotFromNAddress(n: Int, adr: NetAddress): Long = {
+    val nBytes = com.google.common.primitives.Ints.toByteArray(n);
+    val addrBytes = com.google.common.primitives.Ints.toByteArray(adr.hashCode());
+    val bytes = nBytes ++ addrBytes;
+    val r = com.google.common.primitives.Longs.fromByteArray(bytes);
+    assert(r > 0); // should not produce negative numbers!
+    r
+  }
 
   private def startTimer(delay: Long): Unit = {
     val scheduledTimeout = new ScheduleTimeout(period);
@@ -46,51 +51,17 @@ class GossipLeaderElection extends ComponentDefinition {
     trigger(scheduledTimeout -> timer);
   }
 
-  // Maybe broken
-  private def checkLeader() {
-    ballots += ((self, ballot));
-    val top = ballots.maxBy(_._2);
-    val (topProcess, topBallot) = top;
-
-    if (topBallot < highestBallot) {
-      while (ballot <= highestBallot) {
-        ballot = incrementBallotBy(ballot, 1);
-      }
-      leader = None;
-
-      //    } else {
-      //      if (leader.isDefined) {
-      //        // val l = leader.get;
-      //        if ((topBallot, topProcess) != leader.get) {
-      //          highestBallot = topBallot;
-      //          leader = Some((topBallot, topProcess));
-      //          trigger(BLE_Leader(topProcess, topBallot) -> ble);
-      //        }
-      //      } else {
-      //        highestBallot = topBallot;
-      //        leader = Some((topBallot, topProcess));
-      //        trigger(BLE_Leader(topProcess, topBallot) -> ble);
-      //      }
-    } else if ((leader.isDefined && (Some(topBallot, topProcess) != leader)) || leader.isEmpty) {
-        highestBallot = topBallot;
-        leader = Some((topBallot, topProcess));
-        trigger(BLE_Leader(topProcess, topBallot) -> ble);
+  ctrl uponEvent {
+    case _: Start => {
     }
   }
-
-//  ctrl uponEvent {
-//    case _: Start => {
-//      //startTimer(period);
-//    }
-//  }
 
   timer uponEvent {
     case CheckTimeout(_) => {
       if (ballots.size + 1 >= majority) {
         checkLeader();
       }
-      // ballots = mutable.Map.empty[Address, Long];
-      ballots.clear
+      ballots.clear;
       round += 1;
       for (p <- topology) {
         if (p != self) {
@@ -119,19 +90,29 @@ class GossipLeaderElection extends ComponentDefinition {
 
   ble uponEvent {
     case StartElection(nodes: Set[NetAddress]) => {
-      topology = nodes
-      majority = topology.size / 2 + 1
-      startTimer(period)
+      topology = nodes;
+      majority = topology.size / 2 + 1;
+      startTimer(period);
     }
   }
 
-  def ballotFromNAddress(n: Int, adr: NetAddress): Long = {
-    val nBytes = com.google.common.primitives.Ints.toByteArray(n);
-    val addrBytes = com.google.common.primitives.Ints.toByteArray(adr.hashCode());
-    val bytes = nBytes ++ addrBytes;
-    val r = com.google.common.primitives.Longs.fromByteArray(bytes);
-    assert(r > 0); // should not produce negative numbers!
-    r
+  private def checkLeader() {
+    ballots += ((self, ballot));
+    val (topProcess, topBallot) = ballots.maxBy(_._2);
+    if (topBallot < highestBallot) {
+      while (ballot <= highestBallot) {
+        ballot = incrementBallotBy(ballot, 1);
+      }
+      leader = None;
+    } else if ((leader.isDefined && (Some(topBallot, topProcess) != leader)) || leader.isEmpty) {
+      highestBallot = topBallot;
+      makeLeader((topBallot, topProcess));
+      trigger(BLE_Leader(topProcess, topBallot) -> ble);
+    }
+  }
+
+  private def makeLeader(topProcess: (Long, NetAddress)) {
+    leader = Some(topProcess);
   }
 
   def incrementBallotBy(ballot: Long, inc: Int): Long = {

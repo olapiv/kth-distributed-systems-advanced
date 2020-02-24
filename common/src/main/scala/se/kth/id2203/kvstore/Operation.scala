@@ -31,11 +31,17 @@ import se.sics.kompics.KompicsEvent;
 trait Operation extends KompicsEvent {
   def id: UUID;
   def key: String;
+  def source: NetAddress
 }
 
-case class GetOp(src: NetAddress, key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable
-case class PutOp(src: NetAddress, key: String, value: Any, id: UUID = UUID.randomUUID()) extends Operation with Serializable
-case class CasOp(src: NetAddress, key: String, value: Any, referenceValue: Any, id: UUID = UUID.randomUUID()) extends Operation with Serializable
+abstract class Op extends Operation {
+  def response(status: OpCode.OpCode, value: Option[String]): OpResponse = OpResponse(id, status, value);
+}
+
+case class Get(key: String, source: NetAddress, id: UUID = UUID.randomUUID()) extends Op with Serializable
+case class Put(key: String, value: String, source: NetAddress, id: UUID = UUID.randomUUID()) extends Op with Serializable
+case class Cas(key: String, oldValue: String, newValue: String, source: NetAddress, id: UUID = UUID.randomUUID()) extends Op with Serializable
+case class Debug(key: String, source: NetAddress, id: UUID = UUID.randomUUID()) extends Op
 //@SerialVersionUID(-374812437823538710L)
 //case class Op(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
 //  def response(status: OpCode.OpCode): OpResponse = OpResponse(id, status);
@@ -55,4 +61,4 @@ object OpCode {
 }
 
 @SerialVersionUID(155271583133228661L)
-case class OpResponse(id: UUID, status: OpCode.OpCode, value: Any) extends OperationResponse with Serializable;
+case class OpResponse(id: UUID, status: OpCode.OpCode, value: Option[String]) extends OperationResponse with Serializable;

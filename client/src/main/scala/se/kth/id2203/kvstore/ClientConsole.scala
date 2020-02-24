@@ -50,7 +50,7 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
   }
   val getCommand = parsed(getParser, usage = "GET <key>", descr = "Gets a value for a <key>") { key =>
     println(s"GET with $key");
-    val response = runOp(GetOp(service.self, key))
+    val response = runOp(Get(key, service.self))
     if (response != null) {
       println(s"Response received. Status: ${response.status} Value: ${response.value}")
     }
@@ -62,7 +62,7 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
   val putCommand = parsed(putParser, usage = "PUT <key> <value>", descr = "Puts a <value> at a <key>") { parse =>
     val (key, value) = parse
     println(s"PUT value $value to key $key");
-    val response = runOp(PutOp(service.self, key, value))
+    val response = runOp(Put(key, value, service.self))
     if (response != null) {
       println(s"Response received. Status: ${response.status}")
     }
@@ -74,13 +74,13 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
   val casCommand = parsed(casParser, usage = "CAS <key> <value> <referenceValue>", descr = "Puts a <value> at a <key> if current value is <referenceValue>") { parse =>
     val (key, value, referenceValue) = parse
     println(s"CAS value $value to key $key if current value is $referenceValue");
-    val response = runOp(CasOp(service.self, key, value, referenceValue))
+    val response = runOp(Cas(key, referenceValue, value, service.self))
     if (response != null) {
       println(s"Response received. Status: ${response.status}")
     }
   }
 
-  def runOp(operation: Operation): OpResponse = {
+  def runOp(operation: Op): OpResponse = {
     val fr = service.op(operation)
     println("Operation sent! Awaiting response...");
     try {

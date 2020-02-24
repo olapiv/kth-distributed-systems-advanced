@@ -35,7 +35,7 @@ import collection.mutable;
 import concurrent.{Future, Promise};
 
 case class ConnectTimeout(spt: ScheduleTimeout) extends Timeout(spt);
-case class OpWithPromise(op: Operation, promise: Promise[OpResponse] = Promise()) extends KompicsEvent;
+case class OpWithPromise(op: Op, promise: Promise[OpResponse] = Promise()) extends KompicsEvent;
 
 class ClientService extends ComponentDefinition {
 
@@ -104,7 +104,7 @@ class ClientService extends ComponentDefinition {
     }
   }
 
-  def op(op: Operation): Future[OpResponse] = {
+  def op(op: Op): Future[OpResponse] = {
       val owf = OpWithPromise(op);
       trigger(owf -> onSelf);  // gets received by LoopbackPort (loopbck)
       owf.promise.future

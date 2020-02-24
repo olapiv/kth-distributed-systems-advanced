@@ -75,17 +75,17 @@ class VSOverlayManager extends ComponentDefinition {
   //******* Handlers ******
 
   beb uponEvent {
-    case BEB_Deliver(src, payload) => handle {
+    case BEB_Deliver(src, payload) => {
       println(s"(BEB) Received broadcast from $src with $payload");
       trigger(NetMessage(src, self, payload) -> net);
     }
   }
 
   epfd uponEvent {
-    case Suspect(p) => handle {
+    case Suspect(p) => {
       suspected += p
     }
-    case Restore(p) => handle {
+    case Restore(p) => {
       suspected -= p
     }
   }

@@ -26,6 +26,7 @@ package se.kth.id2203;
 
 import se.kth.id2203.kvstore._
 import se.kth.id2203.bootstrapping._
+import se.sics.kompics.sl
 // import se.kth.id2203.failuredetector._
 // import se.kth.id2203.kvstore.KVService     //in kvstore
 import se.kth.id2203.networking.NetAddress
@@ -54,8 +55,8 @@ class ParentComponent extends ComponentDefinition {
   }
 
   val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
-  val epfd: Component = create(classOf[EPFD], Init[EPFD](self));
-  val beb: Component = create(classOf[BasicBroadcast], Init[BasicBroadcast](self));
+  val epfd: Component = create(classOf[EPFD], sl.Init[EPFD](self));
+  val beb: Component = create(classOf[BasicBroadcast], sl.Init[BasicBroadcast](self));
   val ble: Component = create(classOf[GossipLeaderElection], Init.NONE);
   val seqCons: Component = create(classOf[SequencePaxos], Init.NONE);
 

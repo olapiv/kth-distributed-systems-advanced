@@ -1,28 +1,26 @@
 package se.kth.id2203.kvstore
 
 import se.kth.id2203.networking.{NetAddress, NetMessage}
-import se.sics.kompics.sl._
 import se.sics.kompics.network._
-import se.sics.kompics.KompicsEvent
+import se.sics.kompics.sl._
 
-import scala.collection.mutable
+import scala.collection.mutable;
+
+case class Prepare(nL: Long, ld: Int, na: Long) extends KompicsEvent;
+case class Promise(nL: Long, na: Long, suffix: List[Op], ld: Int) extends KompicsEvent;
+case class AcceptSync(nL: Long, suffix: List[Op], ld: Int) extends KompicsEvent;
+case class Accept(nL: Long, c: Op) extends KompicsEvent;
+case class Accepted(nL: Long, m: Int) extends KompicsEvent;
+case class Decide(ld: Int, nL: Long) extends KompicsEvent;
+case class StartSequenceCons(nodes: Set[NetAddress]) extends KompicsEvent;
+case class SC_Propose(value: Op) extends KompicsEvent;
+case class SC_Decide(value: Op) extends KompicsEvent;
 
 class SequenceConsensus extends Port {
-  request[SC_Propose]
-  indication[SC_Decide]
-  request[SC_Topology]
+  request[SC_Propose];
+  indication[SC_Decide];
+  request[StartSequenceCons];
 }
-
-case class SC_Propose(value: Operation) extends KompicsEvent
-case class SC_Decide(value: Operation) extends KompicsEvent
-case class SC_Topology(nodes: Set[NetAddress]) extends KompicsEvent
-
-case class Prepare(nL: Long, ld: Int, na: Long) extends KompicsEvent
-case class Promise(nL: Long, na: Long, suffix: List[Operation], ld: Int) extends KompicsEvent
-case class AcceptSync(nL: Long, suffix: List[Operation], ld: Int) extends KompicsEvent
-case class Accept(nL: Long, c: Operation) extends KompicsEvent
-case class Accepted(nl: Long, m: Int) extends KompicsEvent
-case class Decide(ld: Int, nL: Long) extends KompicsEvent
 
 object State extends Enumeration {
   type State = Value;
@@ -39,69 +37,47 @@ class SequencePaxos extends ComponentDefinition {
   import Role._
   import State._
 
-  val sc = provides[SequenceConsensus];
-  val ble = requires[BallotLeaderElection];
-  val pl = requires[Network];
-
-//  val (self, pi, others) = init match {
-//    case Init(addr: Address, pi: Set[Address] @unchecked) => (addr, pi, pi - addr)
-//  }
+  val sc: NegativePort[SequenceConsensus] = provides[SequenceConsensus];
+  val ble: PositivePort[BallotLeaderElection] = requires[BallotLeaderElection];
+  val pl: PositivePort[Network] = requires[Network];
+  val las = mutable.Map.empty[NetAddress, Int];
+  val lds = mutable.Map.empty[NetAddress, Int];
+  val acks = mutable.Map.empty[NetAddress, (Long, List[Op])];
+  var self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
   var pi: Set[NetAddress] = Set[NetAddress]()
   var others: Set[NetAddress] = Set[NetAddress]()
-  var majority = (pi.size / 2) + 1;
-
-  var state = (FOLLOWER, UNKOWN); // COuld be broken
+  var majority: Int = (pi.size / 2) + 1;
+  var state: (Role.Value, State.Value) = (FOLLOWER, UNKOWN);
   var nL = 0l;
   var nProm = 0l;
   var leader: Option[NetAddress] = None;
   var na = 0l;
-  var va = List.empty[Operation];
+  var va = List.empty[Op];
   var ld = 0;
   // leader state
-  var propCmds = List.empty[Operation];
-  val las = mutable.Map.empty[NetAddress, Int];
-  val lds = mutable.Map.empty[NetAddress, Int];
+  var propCmds = List.empty[Op];
   var lc = 0;
-  val acks = mutable.Map.empty[NetAddress, (Long, List[Operation])];
-  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
-
-  private def maximum( map: mutable.Map[NetAddress, (Long, List[Operation])] ): (Long, List[Operation]) = {
-    var highestRound: Long = 0;
-    var v = List.empty[Operation]
-    for ((_, tuple) <- map) {
-      if( tuple._1 > highestRound ) {
-        highestRound = tuple._1
-        v = tuple._2
-      } else if ( (tuple._1 == highestRound ) && ( tuple._2.size > v.size ) ) {
-        highestRound = tuple._1
-        v = tuple._2
-      }
-    }
-    (highestRound, v)
-  }
-
 
   ble uponEvent {
     case BLE_Leader(l, n) => {
-      /* INSERT YOUR CODE HERE */
-      if (n > nL)  {
+      if (n > nL) {
         leader = Some(l);
         nL = n;
-        if ((self == l) && nL > nProm) {
+        println(s"NEW LEADER ELECTED: $leader");
+        if (self == l && nL > nProm) {
           state = (LEADER, PREPARE);
-          propCmds = List.empty[Operation];
+          propCmds = List.empty[Op];
           for (p <- pi) {
-            las += ((p, 0));
+            las += ((p, 0))
           }
           lds.clear;
           acks.clear;
           lc = 0;
-
-          for (p <- others) {
+          for (p <- pi - self) {
             trigger(NetMessage(self, p, Prepare(nL, ld, na)) -> pl);
           }
-          acks += ((l, (na, suffix(va, ld))));
-          lds += ((self, ld));
+          acks += ((l, (na, suffix(va, ld))))
+          lds += ((self, ld))
           nProm = nL;
         } else {
           state = (FOLLOWER, state._2);
@@ -115,32 +91,35 @@ class SequencePaxos extends ComponentDefinition {
       if (nProm < np) {
         nProm = np;
         state = (FOLLOWER, PREPARE);
-        var sfx: List[Operation] = List.empty[Operation];
-        if (na < n) {
-          sfx = suffix(va, ld);
+        var sfx = List.empty[Op];
+        if (na >= n) {
+          sfx = suffix(va, ldp);
         }
-        trigger(NetMessage(self, p.src, Promise(np, na, sfx, ld)) -> pl);
+        trigger(NetMessage(p.dst, p.src, Promise(np, na, sfx, ldp)) -> pl);
       }
     }
     case NetMessage(a, Promise(n, na, sfxa, lda)) => {
       if ((n == nL) && (state == (LEADER, PREPARE))) {
-        acks += ((a.src, (na, sfxa)));
-        lds += ((a.src, lda));
-        if (acks.size == majority) {
-          val (k, sfx) = maximum(acks);
-          va = prefix(va, ld) ++ sfx ++ propCmds;
-          las(self) = va.size;
-          propCmds = List.empty[Operation];
+        acks += ((a.src, (na, sfxa)))
+        lds += ((a.src, lda))
+        val P = pi.filter(acks isDefinedAt _);
+        val Psize = P.size;
+        if (P.size == majority) {
+          val (k, sfx) = acks.maxBy { case (_, (v, _)) => v };
+          va = prefix(va, ld) ++ sfx._2 ++ propCmds;
+          las(self) = va.size
+          propCmds = List.empty[Op];
           state = (LEADER, ACCEPT);
-          for ((p, v) <- lds) {
-            val sfxp = suffix(va, v);
-            trigger(NetMessage(self, p, AcceptSync(nL, sfxp, v)) -> pl);
+          for (p <- pi) {
+            if ((lds isDefinedAt p) && p != self) {
+              val sfxp = suffix(va, lds(p));
+              trigger(NetMessage(self, p, AcceptSync(nL, sfxp, lds(p))) -> pl);
+            }
           }
         }
       } else if ((n == nL) && (state == (LEADER, ACCEPT))) {
-        lds += ((a.src, lda));
-        val sfx = suffix(va, lds(a.src));
-        //val sfx = suffix(va, lds(a));
+        lds(a.src) = lda;
+        var sfx = suffix(va, lds(a.src));
         trigger(NetMessage(self, a.src, AcceptSync(nL, sfx, lds(a.src))) -> pl);
         if (lc != 0) {
           trigger(NetMessage(self, a.src, Decide(ld, nL)) -> pl);
@@ -155,13 +134,13 @@ class SequencePaxos extends ComponentDefinition {
         state = (FOLLOWER, ACCEPT);
       }
     }
-    case NetMessage(p, Accept(nL, c)) => {
+    case NetMessage(p, Accept(nL, c: Op)) => {
       if ((nProm == nL) && (state == (FOLLOWER, ACCEPT))) {
-        va = va :+ c;
+        va :+= c;
         trigger(NetMessage(self, p.src, Accepted(nL, va.size)) -> pl);
       }
     }
-    case NetMessage(_, Decide(l, nL)) => {
+    case NetMessage(h, Decide(l, nL)) => {
       if (nProm == nL) {
         while (ld < l) {
           trigger(SC_Decide(va(ld)) -> sc);
@@ -172,10 +151,13 @@ class SequencePaxos extends ComponentDefinition {
     case NetMessage(a, Accepted(n, m)) => {
       if ((n == nL) && (state == (LEADER, ACCEPT))) {
         las(a.src) = m;
-        if ((lc < m) && (pi.filter(p => las(p) >= m).size >= majority)) { // Maybe broken
+        var P = pi.filter(las isDefinedAt _).filter(las(_) >= m);
+        if (lc < m && P.size >= majority) {
           lc = m;
-          for ((p, v) <- lds) {
-            trigger(NetMessage(self, p, Decide(lc, nL)) -> pl);
+          for (p <- pi) {
+            if (lds isDefinedAt p) {
+              trigger(NetMessage(self, p, Decide(lc, nL)) -> pl);
+            }
           }
         }
       }
@@ -183,33 +165,34 @@ class SequencePaxos extends ComponentDefinition {
   }
 
   sc uponEvent {
-    case SC_Propose(c) => {
+    case SC_Propose(c: Op) => {
       if (state == (LEADER, PREPARE)) {
-        propCmds = propCmds :+ c;
+        propCmds :+= c;
       }
       else if (state == (LEADER, ACCEPT)) {
-        va = va :+ c;
+        va :+= c;
         las(self) += 1;
-        // las(self) = las(self) + 1;
-        for ((p, v) <- lds) {
-          if (p != self) {
+        for (p <- pi) {
+          if ((lds isDefinedAt p) && p != self) {
             trigger(NetMessage(self, p, Accept(nL, c)) -> pl);
           }
         }
+      } else {
+        println(s"Not the leader - ignore message");
       }
     }
-    case SC_Topology(nodes: Set[NetAddress]) => {
-      pi = nodes
-      majority = pi.size / 2 + 1
-      trigger(StartElection(nodes) -> ble)
+    case StartSequenceCons(nodes: Set[NetAddress]) => {
+      pi = nodes;
+      majority = pi.size / 2 + 1;
+      trigger(StartElection(nodes) -> ble);
     }
   }
 
-  def suffix(s: List[Operation], l: Int): List[Operation] = {
+  def suffix(s: List[Op], l: Int): List[Op] = {
     s.drop(l)
   }
 
-  def prefix(s: List[Operation], l: Int): List[Operation] = {
+  def prefix(s: List[Op], l: Int): List[Op] = {
     s.take(l)
   }
 }
