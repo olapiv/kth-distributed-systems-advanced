@@ -1,5 +1,7 @@
 package se.kth.id2203.kvstore
 
+import java.util.UUID
+
 import com.larskroll.common.collections.TreeSetMultiMap
 import se.kth.id2203.networking.{NetAddress, NetHeader, NetMessage}
 import se.sics.kompics.network.Network
@@ -8,9 +10,11 @@ import se.sics.kompics.sl.{ComponentDefinition, KompicsEvent, Port}
 import scala.collection.mutable
 
 case class Propose(key: Int, value: Any) extends KompicsEvent
+case class ProposeRead(key: Int, requestUUID: UUID) extends KompicsEvent
 case class Decide(key: Int, value: Any) extends KompicsEvent
 class Consensus extends Port {
   request[Propose]
+  request[ProposeRead]
   indication[Decide]
 }
 
@@ -43,6 +47,10 @@ class Paxos(val numProcesses: Int) extends ComponentDefinition {
   var acceptedTimestamp = mutable.Map.empty[Int, Int];  // should default to 0
   var acceptedValue = mutable.Map.empty[Int, Option[Any]];
 
+  // var readProposes = List[UUID].empty
+  // Or:
+  var readProposes = mutable.Map.empty[Int, UUID];  // key, UUID
+
   def propose(key: Int) = {
     if (!decided(key)) {
       timestamp(key) += 1;
@@ -54,7 +62,19 @@ class Paxos(val numProcesses: Int) extends ComponentDefinition {
 
   consensus uponEvent {
     case Propose(key, value) => {
-      proposedValue(key) = Some(value);
+      proposedValue(key) = Some(value);  // Old propose could be overwritten; handle with timeout in Client
+      if (readProposes.contains(key)) {
+        readProposes.remove(key);  // So write does not aborted by previous read
+      }
+      propose(key);
+    }
+
+    case ProposeRead(key, requestUUID) => {
+      /* if (!acceptedValue.contains(key)) {
+        trigger(Decide(key, (requestUUID, None)) -> consensus);
+        return;
+      } */
+      readProposes(key) = requestUUID;
       propose(key);
     }
   }
@@ -100,7 +120,11 @@ class Paxos(val numProcesses: Int) extends ComponentDefinition {
           if(highestBallotPromise._2.isDefined) {
             proposedValue(prepAck.key) = highestBallotPromise._2;
           }
-          trigger(BebBroadcast(Accept(prepAck.key, timestamp(prepAck.key), proposedValue(prepAck.key))) -> beb);
+          if (readProposes.contains(prepAck.key)) {  // Only wanted to READ
+            trigger(Decide(prepAck.key, (readProposes(prepAck.key), highestBallotPromise._2)) -> consensus);
+          } else {
+            trigger(BebBroadcast(Accept(prepAck.key, timestamp(prepAck.key), proposedValue(prepAck.key))) -> beb);
+          }
         }
       }
 
