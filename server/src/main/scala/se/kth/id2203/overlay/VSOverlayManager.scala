@@ -23,12 +23,15 @@
  */
 package se.kth.id2203.overlay;
 
+import se.kth.id2203.bootstrapping._
+import se.kth.id2203.networking._
+import se.sics.kompics.sl._
+import se.sics.kompics.network.Network
+import se.sics.kompics.timer.Timer
+
+import util.Random
+import se.kth.id2203.kvstore.{Beb, BebBroadcast, BebPort, BebTopology, SC_Topology, SequenceConsensus}
 import se.kth.id2203.bootstrapping._;
-import se.kth.id2203.networking._;
-import se.sics.kompics.sl._;
-import se.sics.kompics.network.Network;
-import se.sics.kompics.timer.Timer;
-import util.Random;
 
 /**
   * The V(ery)S(imple)OverlayManager.
@@ -47,6 +50,10 @@ class VSOverlayManager extends ComponentDefinition {
   val boot = requires(Bootstrapping);
   val net = requires[Network];
   val timer = requires[Timer];
+
+  val beb = requires[BebPort];
+  val consensus = requires[SequenceConsensus]
+
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
   private var lut: Option[LookupTable] = None;
@@ -61,6 +68,8 @@ class VSOverlayManager extends ComponentDefinition {
     case Booted(assignment: LookupTable) => {
       log.info("Got NodeAssignment, overlay ready.");
       lut = Some(assignment);
+      trigger(BebTopology(assignment.getNodes()) -> beb)
+      trigger(SC_Topology(assignment.getNodes()) -> consensus)
     }
   }
 

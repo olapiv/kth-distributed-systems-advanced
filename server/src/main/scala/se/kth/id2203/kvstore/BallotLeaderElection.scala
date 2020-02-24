@@ -19,7 +19,7 @@ case class CheckTimeout(timeout: ScheduleTimeout) extends Timeout(timeout);
 case class HeartbeatReq(round: Long, highestBallot: Long) extends KompicsEvent;
 case class HeartbeatResp(round: Long, ballot: Long) extends KompicsEvent;
 
-class GossipLeaderElection(init: Init[GossipLeaderElection]) extends ComponentDefinition {
+class GossipLeaderElection extends ComponentDefinition {
 
   val ble = provides[BallotLeaderElection];
   val pl: PositivePort[Network] = requires[Network];
@@ -58,20 +58,23 @@ class GossipLeaderElection(init: Init[GossipLeaderElection]) extends ComponentDe
       }
       leader = None;
 
-    } else {
-      if (leader.isDefined) {
-        // val l = leader.get;
-        if ((topBallot, topProcess) != leader.get) {
-          highestBallot = topBallot;
-          leader = Some((topBallot, topProcess));
-          trigger(BLE_Leader(topProcess, topBallot) -> ble);
-        }
-      } else {
+      //    } else {
+      //      if (leader.isDefined) {
+      //        // val l = leader.get;
+      //        if ((topBallot, topProcess) != leader.get) {
+      //          highestBallot = topBallot;
+      //          leader = Some((topBallot, topProcess));
+      //          trigger(BLE_Leader(topProcess, topBallot) -> ble);
+      //        }
+      //      } else {
+      //        highestBallot = topBallot;
+      //        leader = Some((topBallot, topProcess));
+      //        trigger(BLE_Leader(topProcess, topBallot) -> ble);
+      //      }
+    } else if ((leader.isDefined && (Some(topBallot, topProcess) != leader)) || leader.isEmpty) {
         highestBallot = topBallot;
         leader = Some((topBallot, topProcess));
         trigger(BLE_Leader(topProcess, topBallot) -> ble);
-      }
-
     }
   }
 
@@ -95,7 +98,6 @@ class GossipLeaderElection(init: Init[GossipLeaderElection]) extends ComponentDe
         }
       }
       startTimer(period);
-
     }
   }
 

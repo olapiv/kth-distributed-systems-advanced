@@ -24,12 +24,12 @@
 package se.kth.id2203;
 
 import se.kth.id2203.bootstrapping._
-import se.kth.id2203.kvstore.KVService;
-import se.kth.id2203.networking.NetAddress;
+import se.kth.id2203.kvstore.{BallotLeaderElection, Beb, BebPort, GossipLeaderElection, KVService, SequenceConsensus, SequencePaxos}
+import se.kth.id2203.networking.NetAddress
 import se.kth.id2203.overlay._
 import se.sics.kompics.sl._
-import se.sics.kompics.Init;
-import se.sics.kompics.network.Network;
+import se.sics.kompics.Init
+import se.sics.kompics.network.Network
 import se.sics.kompics.timer.Timer;
 
 class ParentComponent extends ComponentDefinition {
@@ -45,14 +45,35 @@ class ParentComponent extends ComponentDefinition {
     case None    => create(classOf[BootstrapServer], Init.NONE); // start in server mode
   }
 
+  val beb = create(classOf[Beb], Init.NONE)
+  val ble = create(classOf[GossipLeaderElection], Init.NONE);
+  val consensus = create(classOf[SequencePaxos], Init.NONE);
+
   {
+    // Boot
     connect[Timer](timer -> boot);
     connect[Network](net -> boot);
+
     // Overlay
     connect(Bootstrapping)(boot -> overlay);
     connect[Network](net -> overlay);
+    connect[BebPort](beb -> overlay)
+    connect[SequenceConsensus](consensus -> overlay)
+
     // KV
     connect(Routing)(overlay -> kv);
     connect[Network](net -> kv);
+    connect[SequenceConsensus](consensus -> kv)
+
+    // Beb
+    connect[Network](net -> beb)
+
+    // BLE
+    connect[Timer](timer -> ble)
+    connect[Network](net -> ble)
+
+    // Sequence Paxos
+    connect[Network](net -> consensus)
+    connect[BallotLeaderElection](ble -> consensus)
   }
 }

@@ -10,12 +10,12 @@ import scala.collection.mutable
 class SequenceConsensus extends Port {
   request[SC_Propose]
   indication[SC_Decide]
-  request[StartSequenceCons]
+  request[SC_Topology]
 }
 
 case class SC_Propose(value: Operation) extends KompicsEvent
 case class SC_Decide(value: Operation) extends KompicsEvent
-case class StartSequenceCons(nodes: Set[NetAddress]) extends KompicsEvent
+case class SC_Topology(nodes: Set[NetAddress]) extends KompicsEvent
 
 case class Prepare(nL: Long, ld: Int, na: Long) extends KompicsEvent
 case class Promise(nL: Long, na: Long, suffix: List[Operation], ld: Int) extends KompicsEvent
@@ -198,7 +198,7 @@ class SequencePaxos extends ComponentDefinition {
         }
       }
     }
-    case StartSequenceCons(nodes: Set[NetAddress]) => {
+    case SC_Topology(nodes: Set[NetAddress]) => {
       pi = nodes
       majority = pi.size / 2 + 1
       trigger(StartElection(nodes) -> ble)
