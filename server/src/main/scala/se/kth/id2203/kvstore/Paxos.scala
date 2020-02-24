@@ -93,7 +93,7 @@ class Paxos(val numProcesses: Int) extends ComponentDefinition {
   net uponEvent {
 
     case NetMessage(NetHeader(src, _, _), prepAck: Promise) =>
-      if (timestamp(prepAck.key) == prepAck.timestamp) {
+      if (timestamp(prepAck.key) == prepAck.timestamp) {      // Filter old promises if they are received after long delay and no longer relevant
         promises(prepAck.key) += ((prepAck.acceptedTimestamp, prepAck.acceptedValue));
         if(promises(prepAck.key).size == math.ceil( numProcesses+1 / 2).toInt) {
           var highestBallotPromise = (promises(prepAck.key).maxBy { case (timeSt, accV) => timeSt });
@@ -113,7 +113,7 @@ class Paxos(val numProcesses: Int) extends ComponentDefinition {
       }
 
     case NetMessage(NetHeader(src, _, _), nack: Nack) =>
-      if (timestamp(nack.key) == nack.timestamp) {
+      if (timestamp(nack.key) == nack.timestamp) { // Filter nacks to not propose multiple times if many nacks are received
         propose(nack.key);
       }
   }

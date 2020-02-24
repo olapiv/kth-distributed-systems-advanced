@@ -23,7 +23,9 @@
  */
 package se.kth.id2203.kvstore
 
-import java.util.UUID;
+import java.util.UUID
+
+import se.kth.id2203.networking.NetAddress
 import se.sics.kompics.KompicsEvent;
 
 trait Operation extends KompicsEvent {
@@ -31,9 +33,9 @@ trait Operation extends KompicsEvent {
   def key: Int;
 }
 
-case class GetOp(key: Int, id: UUID = UUID.randomUUID()) extends Operation with Serializable
-case class PutOp(key: Int, value: Any, id: UUID = UUID.randomUUID()) extends Operation with Serializable
-case class CasOp(key: Int, value: Any, referenceValue: Any, id: UUID = UUID.randomUUID()) extends Operation with Serializable
+case class GetOp(src: NetAddress, key: Int, id: UUID = UUID.randomUUID()) extends Operation with Serializable
+case class PutOp(src: NetAddress, key: Int, value: Any, id: UUID = UUID.randomUUID()) extends Operation with Serializable
+case class CasOp(src: NetAddress, key: Int, value: Any, referenceValue: Any, id: UUID = UUID.randomUUID()) extends Operation with Serializable
 //@SerialVersionUID(-374812437823538710L)
 //case class Op(key: String, id: UUID = UUID.randomUUID()) extends Operation with Serializable {
 //  def response(status: OpCode.OpCode): OpResponse = OpResponse(id, status);

@@ -38,36 +38,51 @@ class KVService extends ComponentDefinition {
   //******* Ports ******
   val net = requires[Network];
   val route = requires(Routing);
-  val consensus = requires[Consensus]
+  val consensus = requires[SequenceConsensus]
   //******* Fields ******
   val self = cfg.getValue[NetAddress]("id2203.project.address");
-  private val keyValueMap = mutable.SortedMap.empty[Int, Any];
-  private val pending = mutable.SortedMap.empty[UUID, NetAddress];
+  private val keyValueMap = mutable.Map.empty[Int, Any];
+
   //******* Handlers ******
   net uponEvent {
     case NetMessage(NetHeader(src, _, _), get: GetOp) => {
-      log.info("Got GET operation {}! Header: {};", get, header);
-      trigger(NetMessage(self, header.src, OpResponse(get.id, OpCode.NotImplemented, 0)) -> net);
+      log.info("Got GET operation {}!", get);
+      trigger(SC_Propose(get) -> consensus)
     }
 
     case NetMessage(NetHeader(src, _, _), put: PutOp) => {
-      log.info("Got PUT operation {}! Header: {};", put, header);
-      trigger(Propose(put.key, (put.id, put.value)) -> consensus);
-      pending += ((put.id, src));
+      log.info("Got PUT operation {}!", put);
+      trigger(SC_Propose(put) -> consensus)
     }
 
     case NetMessage(NetHeader(src, _, _), cas: CasOp) => {
-      log.info("Got CAS operation {}! Header: {};", cas, header);
-      trigger(NetMessage(self, header.src, OpResponse(cas.id, OpCode.NotImplemented, 0)) -> net);
+      log.info("Got CAS operation {}!", cas);
+      trigger(SC_Propose(cas) -> consensus)
     }
   }
 
   consensus uponEvent {
-    case Decide(key: Int, value: (UUID, Any)) => {
-      keyValueMap(key) = value._2;
-      if (pending.contains(value._1)) {
-        trigger(NetMessage(self, pending(value._1), OpResponse(value._1, OpCode.Ok, value)) -> net);
+    case SC_Decide(get: GetOp) => {
+      log.info("Done GET operation", get)
+      if (keyValueMap.contains(get.key)) {
+        trigger(NetMessage(self, get.src, OpResponse(get.id, OpCode.Ok, keyValueMap(get.key))) -> net)
+      } else {
+        trigger(NetMessage(self, get.src, OpResponse(get.id, OpCode.Ok, None)) -> net)
       }
+    }
+    case SC_Decide(put: PutOp) => {
+      log.info("Done PUT operation", put)
+      keyValueMap += ((put.key, put.value))
+      trigger(NetMessage(self, put.src, OpResponse(put.id, OpCode.Ok, put.value)) -> net)
+    }
+    case SC_Decide(cas: CasOp) => {
+      log.info("Done CAS operation", cas)
+      if (keyValueMap.contains(cas.key)) {
+        if (keyValueMap(cas.key).equals(cas.referenceValue)) {
+          keyValueMap(cas.key) = cas.value
+        }
+      }
+      trigger(NetMessage(self, cas.src, OpResponse(cas.id, OpCode.Ok, cas.value)) -> net)
     }
   }
 }
