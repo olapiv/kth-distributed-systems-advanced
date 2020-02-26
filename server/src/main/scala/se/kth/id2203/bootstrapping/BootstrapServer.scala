@@ -40,6 +40,14 @@ object BootstrapServer {
 }
 
 class BootstrapServer extends ComponentDefinition {
+  /*
+    1. [Status: Seeding] Wait for "Check-in" messages from BootstrapClients -> add to "active" servers
+    2. If enough active servers -> [Status: Collecting] Seeding Request lookup table from OverlayManager
+    3. If receive lookup table ("initial assignment") -> Send assignment to all active servers
+    4. Wait for "Ready" messages from active servers -> add to "ready" servers
+    5. If enough ready servers -> [Status: Done] Send "Booted" to OverlayManager
+    6. Kill BootstrapServer component (not entire server)
+   */
   import BootstrapServer._;
 
   //******* Ports ******
@@ -67,13 +75,16 @@ class BootstrapServer extends ComponentDefinition {
     }
   }
 
-  timer uponEvent {
+  timer uponEvent {  // Gets triggered recurrently since timeout is periodic
     case BSTimeout(_) => {
+      log.info("BSTimeout!");
       state match {
         case Collecting => {
           log.info("{} hosts in active set.", active.size);
           if (active.size >= bootThreshold) {
             bootUp();
+          } else {
+            log.info("BootThreshold was not reached.");
           }
         }
         case Seeding => {
@@ -85,7 +96,8 @@ class BootstrapServer extends ComponentDefinition {
                 trigger(Booted(assignment) -> boot);
                 state = Done;
               }
-              case None => {
+              case None => {  // Could just check when receiving InitialAssignments from VSOverlayManager...
+                log.info("Committing suicide because no initial assignment received at bootThreshold.");
                 logger.error(s"No initial assignment received at bootThreshold. Ready nodes: $ready");
                 suicide();
               }
@@ -93,6 +105,7 @@ class BootstrapServer extends ComponentDefinition {
           }
         }
         case Done => {
+          log.info("Committing suicide because state == Done.");
           suicide();
         }
       }
@@ -100,7 +113,7 @@ class BootstrapServer extends ComponentDefinition {
   }
 
   boot uponEvent {
-    case InitialAssignments(assignment) => {
+    case InitialAssignments(assignment) => {  // Assignment == Lookup-table
       initialAssignment = Some(assignment);
       log.info("Seeding assignments...");
       active foreach { node =>
@@ -120,6 +133,9 @@ class BootstrapServer extends ComponentDefinition {
   }
 
   override def tearDown(): Unit = {
+    /*
+      Probably gets called when calling suicide()
+     */
     timeoutId match {
       case Some(tid) => trigger(new CancelPeriodicTimeout(tid) -> timer);
       case None      => // nothing to clean up
