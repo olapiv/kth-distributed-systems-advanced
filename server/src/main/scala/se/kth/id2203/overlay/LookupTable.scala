@@ -24,10 +24,9 @@
 package se.kth.id2203.overlay;
 
 import com.larskroll.common.collections._;
-// import java.util.Collection;
+import java.util.Collection;
 import se.kth.id2203.bootstrapping.NodeAssignment;
 import se.kth.id2203.networking.NetAddress;
-import scala.collection.mutable;
 
 @SerialVersionUID(6322485231428233902L)
 class LookupTable extends NodeAssignment with Serializable {
@@ -35,14 +34,11 @@ class LookupTable extends NodeAssignment with Serializable {
   val partitions = TreeSetMultiMap.empty[Int, NetAddress];
 
   def lookup(key: String): Iterable[NetAddress] = {
-    var keyHash = key.hashCode();
-    // val keyHash = key.hashCode();
-    // val partition = partitions.floor(keyHash) match {
-    //   case Some(k) => k
-    //   case None    => partitions.lastKey
-    // }
-    if (keyHash < 0) keyHash *= (-1);
-    val partition = keyHash % (partitions.lastKey + 1);
+    val keyHash = key.hashCode();
+    val partition = partitions.floor(keyHash) match {
+      case Some(k) => k
+      case None    => partitions.lastKey
+    }
     return partitions(partition);
   }
 
@@ -58,33 +54,12 @@ class LookupTable extends NodeAssignment with Serializable {
     return sb.toString();
   }
 
-
-  // Added
-  def getPartitionsAsString() = {
-    partitions.map(_._2).mkString("|")
-  }
-
 }
 
 object LookupTable {
-  // def generate(nodes: Set[NetAddress]): LookupTable = {
-  //   val lut = new LookupTable();
-  //   lut.partitions ++= (0 -> nodes);
-  //   lut
-  // }
-
-  def generate(nodes: Set[NetAddress], delta: Int): LookupTable = {
-    val lut = new LookupTable()
-    var counter = 0
-    var set: mutable.Set[NetAddress] = mutable.Set.empty
-    for (netAddress <- nodes) {
-      set += netAddress
-      if (set.size == delta) {
-        lut.partitions ++= (counter -> set)
-        counter += 1
-        set.clear()
-      }
-    }
+  def generate(nodes: Set[NetAddress]): LookupTable = {
+    val lut = new LookupTable();
+    lut.partitions ++= (0 -> nodes);
     lut
   }
 }

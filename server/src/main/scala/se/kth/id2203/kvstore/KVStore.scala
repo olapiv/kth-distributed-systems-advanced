@@ -23,55 +23,23 @@
  */
 package se.kth.id2203.kvstore;
 
-import se.kth.id2203.networking._
-import se.kth.id2203.overlay.Routing
-import se.sics.kompics.network.Network
-import se.sics.kompics.sl._
-
-import scala.collection.mutable;
+import se.kth.id2203.networking._;
+import se.kth.id2203.overlay.Routing;
+import se.sics.kompics.sl._;
+import se.sics.kompics.network.Network;
 
 class KVService extends ComponentDefinition {
 
   //******* Ports ******
-  val net: PositivePort[Network] = requires[Network];
-  val route: PositivePort[Routing.type] = requires(Routing);
-  val sc: PositivePort[SequenceConsensus] = requires[SequenceConsensus];
+  val net = requires[Network];
+  val route = requires(Routing);
   //******* Fields ******
-  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
-
-  // members
-  val store = mutable.Map.empty[String, String]
-
-  for (i <- 0 to 10) {
-    store += ((i.toString, (10 - i).toString))
-  }
-
+  val self = cfg.getValue[NetAddress]("id2203.project.address");
   //******* Handlers ******
   net uponEvent {
     case NetMessage(header, op: Op) => {
-      trigger(SC_Propose(op) -> sc);
-    }
-  }
-
-  sc uponEvent {
-    case SC_Decide(get: Get) => {
-      println(s"Performed GET operation $get");
-      val result = if (store contains get.key) Some(store(get.key)) else None
-      trigger(NetMessage(self, get.source, get.response(OpCode.Ok, result)) -> net);
-    }
-    case SC_Decide(put: Put) => {
-      println(s"Performed PUT operation $put");
-      store += ((put.key, put.value))
-      trigger(NetMessage(self, put.source, put.response(OpCode.Ok, Some(put.value))) -> net);
-    }
-    case SC_Decide(cas: Cas) => {
-      println(s"Performed CAS operation $cas");
-      val storedValue: Option[String] =
-        if (store.get(cas.key).isDefined) Some(store(cas.key))
-        else None
-      if (storedValue.isDefined && storedValue.get == cas.oldValue) store += ((cas.key, cas.newValue))
-      trigger(NetMessage(self, cas.source, cas.response(OpCode.Ok, storedValue)) -> net)
-
+      log.info("Got operation {}! Now implement me please :)", op);
+      trigger(NetMessage(self, header.src, op.response(OpCode.NotImplemented)) -> net);
     }
   }
 }

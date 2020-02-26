@@ -23,23 +23,14 @@
  */
 package se.kth.id2203;
 
-
-import se.kth.id2203.kvstore._
 import se.kth.id2203.bootstrapping._
-import se.sics.kompics.sl
-// import se.kth.id2203.failuredetector._
-// import se.kth.id2203.kvstore.KVService     //in kvstore
-import se.kth.id2203.networking.NetAddress
+import se.kth.id2203.kvstore.KVService;
+import se.kth.id2203.networking.NetAddress;
 import se.kth.id2203.overlay._
-// import se.kth.id2203.sequencepaxos.{BallotLeaderElection, GossipLeaderElection, SequenceConsensus, SequencePaxos} // in kvstore
-import se.sics.kompics.Component
-import se.sics.kompics.network.Network
-import se.sics.kompics.timer.Timer;
 import se.sics.kompics.sl._
-import se.sics.kompics.Init
-
-// import se.kth.id2203.kvstore.{BallotLeaderElection, Beb, BebPort, GossipLeaderElection, KVService, SequenceConsensus, SequencePaxos}
-
+import se.sics.kompics.Init;
+import se.sics.kompics.network.Network;
+import se.sics.kompics.timer.Timer;
 
 class ParentComponent extends ComponentDefinition {
 
@@ -54,42 +45,14 @@ class ParentComponent extends ComponentDefinition {
     case None    => create(classOf[BootstrapServer], Init.NONE); // start in server mode
   }
 
-  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
-  val epfd: Component = create(classOf[EPFD], sl.Init[EPFD](self));
-  val beb: Component = create(classOf[BasicBroadcast], sl.Init[BasicBroadcast](self));
-  val ble: Component = create(classOf[GossipLeaderElection], Init.NONE);
-  val seqCons: Component = create(classOf[SequencePaxos], Init.NONE);
-
   {
-    // Boot
     connect[Timer](timer -> boot);
     connect[Network](net -> boot);
-
     // Overlay
     connect(Bootstrapping)(boot -> overlay);
     connect[Network](net -> overlay);
-    connect[EventuallyPerfectFailureDetector](epfd -> overlay);
-    connect[BestEffortBroadcast](beb -> overlay)
-    connect[SequenceConsensus](seqCons -> overlay)
-
     // KV
     connect(Routing)(overlay -> kv);
     connect[Network](net -> kv);
-    connect[SequenceConsensus](seqCons -> kv);
-
-    // EPFD
-    connect[Timer](timer -> epfd);
-    connect[Network](net -> epfd);
-
-    // BEB
-    connect[Network](net -> beb);
-
-    // BLE
-    connect[Timer](timer -> ble)
-    connect[Network](net -> ble)
-
-    // Sequence Paxos
-    connect[Network](net -> seqCons);
-    connect[BallotLeaderElection](ble -> seqCons);
   }
 }

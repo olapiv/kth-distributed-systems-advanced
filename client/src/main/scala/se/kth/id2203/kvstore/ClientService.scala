@@ -35,7 +35,7 @@ import collection.mutable;
 import concurrent.{Future, Promise};
 
 case class ConnectTimeout(spt: ScheduleTimeout) extends Timeout(spt);
-case class OpWithPromise(op: Op, promise: Promise[OpResponse] = Promise()) extends KompicsEvent;
+case class OpWithPromise(op: Operation, promise: Promise[OpResponse] = Promise()) extends KompicsEvent;
 
 class ClientService extends ComponentDefinition {
 
@@ -75,7 +75,7 @@ class ClientService extends ComponentDefinition {
       val tc = new Thread(c);
       tc.start();
     }
-    case NetMessage(header, or @ OpResponse(id, status, value)) => {
+    case NetMessage(header, or @ OpResponse(id, status)) => {
       log.debug(s"Got OpResponse: $or");
       pending.remove(id) match {
         case Some(promise) => promise.success(or);
@@ -104,9 +104,10 @@ class ClientService extends ComponentDefinition {
     }
   }
 
-  def op(op: Op): Future[OpResponse] = {
-      val owf = OpWithPromise(op);
-      trigger(owf -> onSelf);  // gets received by LoopbackPort (loopbck)
-      owf.promise.future
+  def op(key: String): Future[OpResponse] = {
+    val op = Op(key);
+    val owf = OpWithPromise(op);
+    trigger(owf -> onSelf);
+    owf.promise.future
   }
 }

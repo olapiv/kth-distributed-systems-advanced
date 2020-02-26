@@ -35,7 +35,7 @@ object ClientConsole {
   def lowercase[_: P] = P(CharIn("a-z"))
   def uppercase[_: P] = P(CharIn("A-Z"))
   def digit[_: P] = P(CharIn("0-9"))
-  def simpleStr[_: P] = P(lowercase | uppercase | digit).rep!
+  def simpleStr[_: P] = P(lowercase | uppercase | digit)
   val colouredLayout = new ColoredPatternLayout("%d{[HH:mm:ss,SSS]} %-5p {%c{1}} %m%n");
 }
 
@@ -45,55 +45,12 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
   override def layout: Layout = colouredLayout;
   override def onInterrupt(): Unit = exit();
 
-  val getParser = new ParsingObject[String] {
-    override def parseOperation[_: P]: P[String] = P("GET" ~ " " ~ simpleStr.!);
-  }
-  val getCommand = parsed(getParser, usage = "GET <key>", descr = "Gets a value for a <key>") { key =>
-    println(s"GET with $key");
-    val response = runOp(Get(key, service.self))
-    if (response != null) {
-      println(s"Response received. Status: ${response.status} Value: ${response.value}")
-    }
+  val opParser = new ParsingObject[String] {
+    override def parseOperation[_: P]: P[String] = P("op" ~ " " ~ simpleStr.!);
   }
 
-  val putParser = new ParsingObject[(String, String)] {
-    override def parseOperation[_: P]: P[(String, String)] = P("PUT" ~ " " ~ simpleStr.! ~ " " ~ simpleStr.!);
-  }
-  val putCommand = parsed(putParser, usage = "PUT <key> <value>", descr = "Puts a <value> at a <key>") { parse =>
-    val (key, value) = parse
-    println(s"PUT value $value to key $key");
-    val response = runOp(Put(key, value, service.self))
-    if (response != null) {
-      println(s"Response received. Status: ${response.status}")
-    }
-  }
-
-  val casParser = new ParsingObject[(String, String, String)] {
-    override def parseOperation[_: P]: P[(String, String, String)] = P("CAS" ~ " " ~ simpleStr.! ~ " " ~ simpleStr.! ~ " " ~ simpleStr.!);
-  }
-  val casCommand = parsed(casParser, usage = "CAS <key> <value> <referenceValue>", descr = "Puts a <value> at a <key> if current value is <referenceValue>") { parse =>
-    val (key, value, referenceValue) = parse
-    println(s"CAS value $value to key $key if current value is $referenceValue");
-    val response = runOp(Cas(key, referenceValue, value, service.self))
-    if (response != null) {
-      println(s"Response received. Status: ${response.status}")
-    }
-  }
-
-  def runOp(operation: Op): OpResponse = {
-    val fr = service.op(operation)
-    println("Operation sent! Awaiting response...");
-    try {
-      Await.result(fr, 5.seconds);
-    } catch {
-      case e: Throwable => logger.error("Error during op.", e)
-      null
-    }
-  }
-
-  /*
-  val GETCommand = parsed(opParser, usage = "GET <key>", descr = "Gets value for <key>.") { key =>
-    println(s"GET value for key: $key");
+  val opCommand = parsed(opParser, usage = "op <key>", descr = "Executes an op for <key>.") { key =>
+    println(s"Op with $key");
 
     val fr = service.op(key);
     out.println("Operation sent! Awaiting response...");
@@ -101,8 +58,8 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
       val r = Await.result(fr, 5.seconds);
       out.println("Operation complete! Response was: " + r.status);
     } catch {
-      case e: Throwable => logger.error("Error during GET.", e);
+      case e: Throwable => logger.error("Error during op.", e);
     }
   };
-  */
+
 }

@@ -1,6 +1,8 @@
 bin/
+
 .classpath
 .project
+
 *.class
 *.log
 
@@ -23,7 +25,7 @@ project/plugins/project/
 .cache-tests
 
 # Intellij
-.idea/*
+.idea/
 *.iml
 *.iws
 
@@ -36,5 +38,3 @@ nb-configuration.xml
 .bloop/
 .metals/
 *.code-workspace
-
-!.idea/runConfigurations/
