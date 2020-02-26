@@ -91,8 +91,8 @@ class VSOverlayManager extends ComponentDefinition {
   }
 
   boot uponEvent {
-    case GetInitialAssignments(nodes) => {
-      log.info("Generating LookupTable...");
+    case GetInitialAssignments(nodes) => {  // Request received from Bootstrap Server
+      log.info("Generating LookupTable... nodes={}", nodes);
       val delta = cfg.getValue[Int]("id2203.project.delta")
       logger.debug(s"Delta: $delta")
       logger.debug(s"Nodes: $nodes")
@@ -101,11 +101,13 @@ class VSOverlayManager extends ComponentDefinition {
       trigger(new InitialAssignments(lut) -> boot);
     }
     case Booted(assignment: LookupTable) => {
+      log.info("assignment: ", assignment);
       log.info("Got NodeAssignment, overlay ready.");
       lut = Some(assignment);
       // trigger(BebTopology(assignment.getNodes()) -> beb)
       // trigger(SC_Topology(assignment.getNodes()) -> consensus)
       val myPartitionTuple = assignment.partitions.find(_._2.exists(_.equals(self)))
+      log.info("assignment.partitions: ", assignment.partitions);
       myPartitionTuple match {
         case Some((_, myPartition)) =>
           trigger(StartDetector(lut, myPartition.toSet) -> epfd)
@@ -113,7 +115,7 @@ class VSOverlayManager extends ComponentDefinition {
           trigger(StartSequenceCons(myPartition.toSet) -> seqCons)
         case None =>
           println("Could not find my partition.")
-          throw new Exception(self + " Could not find its own partition in lookup table!")
+          throw new Exception(self.toString() + " Could not find its own partition in lookup table!")
       }
     }
   }
