@@ -54,12 +54,10 @@ class ParentComponent extends ComponentDefinition {
     case None    => create(classOf[BootstrapServer], Init.NONE); // start in server mode
   }
 
-  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
-  val epfd: Component = create(classOf[EPFD], sl.Init[EPFD](self));
-  val beb: Component = create(classOf[BasicBroadcast], sl.Init[BasicBroadcast](self));
+  val epfd: Component = create(classOf[EPFD], Init.NONE);
+  val beb: Component = create(classOf[BasicBroadcast], Init.NONE);
   val ble: Component = create(classOf[GossipLeaderElection], Init.NONE);
   val seqCons: Component = create(classOf[SequencePaxos], Init.NONE);
-
   {
     // Boot
     connect[Timer](timer -> boot);

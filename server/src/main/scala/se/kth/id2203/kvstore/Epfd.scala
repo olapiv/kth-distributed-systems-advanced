@@ -26,8 +26,7 @@ class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
   val pLink = requires[Network];
   val epfd = provides[EventuallyPerfectFailureDetector];
 
-
-  val self = epfdInit match {case Init(s: NetAddress) => s};
+  val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
   var currentTopology: List[NetAddress] = List.empty;
   var systemTopology: Option[LookupTable] = None
 

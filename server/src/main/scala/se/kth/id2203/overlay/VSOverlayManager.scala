@@ -111,7 +111,7 @@ class VSOverlayManager extends ComponentDefinition {
       myPartitionTuple match {
         case Some((_, myPartition)) =>
           trigger(StartDetector(lut, myPartition.toSet) -> epfd)
-          trigger(SetTopology(lut, myPartition.toSet) -> beb)
+          trigger(BEB_Topology(myPartition.toSet) -> beb)
           trigger(StartSequenceCons(myPartition.toSet) -> seqCons)
         case None =>
           println("Could not find my partition.")
@@ -150,13 +150,6 @@ class VSOverlayManager extends ComponentDefinition {
       } while (addr.contains(self))
       trigger(NetMessage(header.src, addr.get, Debug("Suicide", dm.source)) -> net)
     }
-    case NetMessage(header, RouteMsg("FailureDetect", dm: Debug)) => {
-      trigger(NetMessage(self, header.src, dm.response(OpCode.Ok, Some(lut.get.getPartitionsAsString()))) -> net)
-      trigger(BEB_Broadcast_Global(dm) -> beb)
-    }
-    case NetMessage(_, RouteMsg("BroadcastFlood", dm: Debug)) => {
-      trigger(BEB_Broadcast_Global(dm) -> beb)
-    }
     case NetMessage(header, RouteMsg("ExtractPartitionInfo", _: Debug)) =>  {
       // do not use broadcast to test partitions
       for (tuple <- lut.get.partitions; address <- tuple._2) {
@@ -170,7 +163,7 @@ class VSOverlayManager extends ComponentDefinition {
 
     case NetMessage(header, RouteMsg(key, msg: Op)) => {
       val nodes = lut.get.lookup(key).toSet
-      trigger(SetTopology(lut, nodes) -> beb);
+      trigger(BEB_Topology(nodes) -> beb);
       trigger(BEB_Broadcast(msg) -> beb);
     }
 
@@ -196,7 +189,7 @@ class VSOverlayManager extends ComponentDefinition {
       // val target = nodes.drop(i).head;
       // log.info(s"Routing message for key $key to $target");
       // trigger(NetMessage(self, target, msg) -> net);
-      trigger(SetTopology(lut, nodes) -> beb);
+      trigger(BEB_Topology(nodes) -> beb);
       trigger(BEB_Broadcast(msg) -> beb);
     }
   }
