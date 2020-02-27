@@ -20,7 +20,7 @@ class EventuallyPerfectFailureDetector extends Port {
   request[StartDetector];
 }
 
-class EPFD(epfdInit: Init[EPFD]) extends ComponentDefinition {
+class EPFD extends ComponentDefinition {
 
   val timer = requires[Timer];
   val pLink = requires[Network];

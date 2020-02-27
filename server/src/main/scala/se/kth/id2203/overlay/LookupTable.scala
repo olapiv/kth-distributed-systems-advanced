@@ -36,14 +36,9 @@ class LookupTable extends NodeAssignment with Serializable {
 
   def lookup(key: String): Iterable[NetAddress] = {
     var keyHash = key.hashCode();
-    // val keyHash = key.hashCode();
-    // val partition = partitions.floor(keyHash) match {
-    //   case Some(k) => k
-    //   case None    => partitions.lastKey
-    // }
     if (keyHash < 0) keyHash *= (-1);
     val partition = keyHash % (partitions.lastKey + 1);
-    return partitions(partition);
+    partitions(partition);
   }
 
   def getNodes(): Set[NetAddress] = partitions.foldLeft(Set.empty[NetAddress]) {
@@ -58,21 +53,14 @@ class LookupTable extends NodeAssignment with Serializable {
     return sb.toString();
   }
 
-
   // Added
-  def getPartitionsAsString() = {
-    partitions.map(_._2).mkString("|")
-  }
+//  def getPartitionsAsString() = {
+//    partitions.map(_._2).mkString("|")
+//  }
 
 }
 
 object LookupTable {
-  // def generate(nodes: Set[NetAddress]): LookupTable = {
-  //   val lut = new LookupTable();
-  //   lut.partitions ++= (0 -> nodes);
-  //   lut
-  // }
-
   def generate(nodes: Set[NetAddress], delta: Int): LookupTable = {
     val lut = new LookupTable()
     var counter = 0

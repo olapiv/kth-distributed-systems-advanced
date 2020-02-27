@@ -29,11 +29,6 @@ import se.kth.id2203.networking._
 import se.sics.kompics.network.Network
 import se.sics.kompics.sl._
 import se.sics.kompics.timer.Timer
-//case class Debug(key: String, source: NetAddress, id: UUID = UUID.randomUUID()) extends Op
-
-// import util.Random
-// import se.kth.id2203.kvstore.{Beb, BebBroadcast, BebPort, BebTopology, SC_Topology, SequenceConsensus}
-// import se.kth.id2203.bootstrapping._;
 
 /**
   * The V(ery)S(imple)OverlayManager.
@@ -48,35 +43,22 @@ import se.sics.kompics.timer.Timer
 class VSOverlayManager extends ComponentDefinition {
 
   //******* Ports ******
-  // val route = provides(Routing);
-  // val boot = requires(Bootstrapping);
-  // val net = requires[Network];
-  // val timer = requires[Timer];
-
-  // val beb = requires[BebPort];
-  // val consensus = requires[SequenceConsensus]
-
-  val route: NegativePort[Routing.type] = provides(Routing)
-  val boot: PositivePort[Bootstrapping.type] = requires(Bootstrapping)
-  val net: PositivePort[Network] = requires[Network]
-  val timer: PositivePort[Timer] = requires[Timer]
-  val epfd: PositivePort[EventuallyPerfectFailureDetector] = requires[EventuallyPerfectFailureDetector]
-  val beb: PositivePort[BestEffortBroadcast] = requires[BestEffortBroadcast]
+  val route = provides(Routing)
+  val boot= requires(Bootstrapping)
+  val net = requires[Network]
+  val timer = requires[Timer]
+  val epfd = requires[EventuallyPerfectFailureDetector]
+  val beb = requires[BestEffortBroadcast]
 
   //******* Fields ******
-  // val self = cfg.getValue[NetAddress]("id2203.project.address");
-  // private var lut: Option[LookupTable] = None;
-
   val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
-  var seqCons: PositivePort[SequenceConsensus] = requires[SequenceConsensus]
+  var seqCons = requires[SequenceConsensus]
   var suspected = Set[NetAddress]()
-  private var lut: Option[LookupTable] = None
+  var lut: Option[LookupTable] = None
 
   //******* Handlers ******
-
   beb uponEvent {
     case BEB_Deliver(src, payload) => {
-      println(s"(BEB) Received broadcast from $src with $payload");
       trigger(NetMessage(src, self, payload) -> net);
     }
   }
@@ -104,64 +86,20 @@ class VSOverlayManager extends ComponentDefinition {
       log.info("assignment: ", assignment);
       log.info("Got NodeAssignment, overlay ready.");
       lut = Some(assignment);
-      // trigger(BebTopology(assignment.getNodes()) -> beb)
-      // trigger(SC_Topology(assignment.getNodes()) -> consensus)
-      val myPartitionTuple = assignment.partitions.find(_._2.exists(_.equals(self)))
-      log.info("assignment.partitions: ", assignment.partitions);
-      myPartitionTuple match {
-        case Some((_, myPartition)) =>
-          trigger(StartDetector(lut, myPartition.toSet) -> epfd)
-          trigger(BEB_Topology(myPartition.toSet) -> beb)
-          trigger(StartSequenceCons(myPartition.toSet) -> seqCons)
+      val currentPartition = assignment.partitions.find(_._2.exists(_.equals(self)))
+      currentPartition match {
+        case Some((_, cp)) =>
+          trigger(BEB_Topology(cp.toSet) -> beb)
+          trigger(StartDetector(lut, cp.toSet) -> epfd)
+          trigger(StartSequenceCons(cp.toSet) -> seqCons)
         case None =>
-          println("Could not find my partition.")
-          throw new Exception(self.toString() + " Could not find its own partition in lookup table!")
+          print("Current partition not found")
       }
     }
   }
 
-  // net uponEvent {
-  //   case NetMessage(header, RouteMsg(key, msg)) => {
-  //     val nodes = lut.get.lookup(key);
-  //     assert(!nodes.isEmpty);
-  //     val i = Random.nextInt(nodes.size);
-  //     val target = nodes.drop(i).head;
-  //     log.info(s"Forwarding message for key $key to $target");
-  //     trigger(NetMessage(header.src, target, msg) -> net);
-  //   }
-  //   case NetMessage(header, msg: Connect) => {
-  //     lut match {
-  //       case Some(l) => {
-  //         log.debug("Accepting connection request from ${header.src}");
-  //         val size = l.getNodes().size;
-  //         trigger(NetMessage(self, header.src, msg.ack(size)) -> net);
-  //       }
-  //       case None => log.info("Rejecting connection request from ${header.src}, as system is not ready, yet.");
-  //     }
-  //   }
-  // }
   net uponEvent {
-    case NetMessage(header, RouteMsg(killCmd, dm: Debug)) if killCmd startsWith "Kill/key:" => {
-      val key = killCmd.replace("Kill/key:", "")
-      val partIterator = lut.get.lookup(key).iterator
-      var addr: Option[NetAddress] = None
-      do {
-        addr = Some(partIterator.next())
-      } while (addr.contains(self))
-      trigger(NetMessage(header.src, addr.get, Debug("Suicide", dm.source)) -> net)
-    }
-    case NetMessage(header, RouteMsg("ExtractPartitionInfo", _: Debug)) =>  {
-      // do not use broadcast to test partitions
-      for (tuple <- lut.get.partitions; address <- tuple._2) {
-        val routeMsg = RouteMsg("PartitionInfo", Debug("PartitionInfo", self))
-        trigger(NetMessage(header.src, address, routeMsg) -> net)
-      }
-    }
-    case NetMessage(header, RouteMsg("PartitionInfo", dm: Debug)) => {
-      trigger(NetMessage(self, header.src, dm.response(OpCode.Ok, Some(lut.get.getPartitionsAsString()))) -> net)
-    }
-
-    case NetMessage(header, RouteMsg(key, msg: Op)) => {
+    case NetMessage(_, RouteMsg(key, msg: Op)) => {
       val nodes = lut.get.lookup(key).toSet
       trigger(BEB_Topology(nodes) -> beb);
       trigger(BEB_Broadcast(msg) -> beb);
@@ -179,16 +117,9 @@ class VSOverlayManager extends ComponentDefinition {
     }
   }
 
-
-
   route uponEvent {
     case RouteMsg(key, msg) => {
       val nodes = lut.get.lookup(key).toSet;
-      // assert(!nodes.isEmpty);
-      // val i = Random.nextInt(nodes.size);
-      // val target = nodes.drop(i).head;
-      // log.info(s"Routing message for key $key to $target");
-      // trigger(NetMessage(self, target, msg) -> net);
       trigger(BEB_Topology(nodes) -> beb);
       trigger(BEB_Broadcast(msg) -> beb);
     }
