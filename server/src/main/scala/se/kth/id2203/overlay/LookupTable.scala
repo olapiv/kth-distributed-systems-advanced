@@ -29,7 +29,6 @@ import se.kth.id2203.bootstrapping.NodeAssignment;
 import se.kth.id2203.networking.NetAddress;
 import scala.collection.mutable;
 
-@SerialVersionUID(6322485231428233902L)
 class LookupTable extends NodeAssignment with Serializable {
 
   val partitions = TreeSetMultiMap.empty[Int, NetAddress];

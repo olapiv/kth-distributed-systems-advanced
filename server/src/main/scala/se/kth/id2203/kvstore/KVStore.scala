@@ -21,7 +21,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package se.kth.id2203.kvstore;
+package se.kth.id2203.kvstore
+
+;
 
 import se.kth.id2203.networking._
 import se.kth.id2203.overlay.Routing
@@ -36,42 +38,40 @@ class KVService extends ComponentDefinition {
   val net: PositivePort[Network] = requires[Network];
   val route: PositivePort[Routing.type] = requires(Routing);
   val sc: PositivePort[SequenceConsensus] = requires[SequenceConsensus];
+
   //******* Fields ******
   val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address");
 
   // members
-  val store = mutable.Map.empty[String, String]
+  val keyValueMap = mutable.Map.empty[String, String]
 
   for (i <- 0 to 10) {
-    store += ((i.toString, (10 - i).toString))
+    keyValueMap += ((i.toString, (100 + i).toString))
   }
 
   //******* Handlers ******
   net uponEvent {
-    case NetMessage(header, op: Op) => {
+    case NetMessage(_, op: Op) => {
       trigger(SC_Propose(op) -> sc);
     }
   }
 
   sc uponEvent {
-    case SC_Decide(get: Get) => {
-      println(s"Performed GET operation $get");
-      val result = if (store contains get.key) Some(store(get.key)) else None
-      trigger(NetMessage(self, get.source, get.response(OpCode.Ok, result)) -> net);
+    case SC_Decide(op: Get) => {
+      println(s"GET operation $op");
+      val result = if (keyValueMap contains op.key) Some(keyValueMap(op.key)) else None
+      trigger(NetMessage(self, op.source, op.response(OpCode.Ok, result)) -> net);
     }
-    case SC_Decide(put: Put) => {
-      println(s"Performed PUT operation $put");
-      store += ((put.key, put.value))
-      trigger(NetMessage(self, put.source, put.response(OpCode.Ok, Some(put.value))) -> net);
+    case SC_Decide(op: Put) => {
+      println(s"PUT operation $op");
+      keyValueMap += ((op.key, op.value))
+      trigger(NetMessage(self, op.source, op.response(OpCode.Ok, Some(op.value))) -> net);
     }
-    case SC_Decide(cas: Cas) => {
-      println(s"Performed CAS operation $cas");
-      val storedValue: Option[String] =
-        if (store.get(cas.key).isDefined) Some(store(cas.key))
-        else None
-      if (storedValue.isDefined && storedValue.get == cas.oldValue) store += ((cas.key, cas.newValue))
-      trigger(NetMessage(self, cas.source, cas.response(OpCode.Ok, storedValue)) -> net)
-
+    case SC_Decide(op: Cas) => {
+      println(s"CAS operation $op");
+      val storedValue: Option[String] = if (keyValueMap.get(op.key).isDefined) Some(keyValueMap(op.key)) else None
+      if (storedValue.isDefined && storedValue.get == op.oldValue) keyValueMap += ((op.key, op.newValue))
+      trigger(NetMessage(self, op.source, op.response(OpCode.Ok, storedValue)) -> net)
     }
   }
 }

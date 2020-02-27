@@ -37,9 +37,6 @@ class SequencePaxos extends ComponentDefinition {
   import Role._
   import State._
 
-  // val sc: NegativePort[SequenceConsensus] = provides[SequenceConsensus];
-  // val ble: PositivePort[BallotLeaderElection] = requires[BallotLeaderElection];
-  // val pl: PositivePort[Network] = requires[Network];
   val sc = provides[SequenceConsensus];
   val ble = requires[BallotLeaderElection];
   val pl = requires[Network];
