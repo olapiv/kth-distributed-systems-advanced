@@ -56,6 +56,23 @@ class OpsTest extends FlatSpec with Matchers {
       SimulationResult.get[String]("message"+i.toString).get shouldBe (100+i).toString;
     }
   }
+
+  "PUT CAS GET operations in the KV-store" should "be linearizable" in {
+    val seed = 123L
+    JSimulationScenario.setSeed(seed)
+    val simpleBootScenario = SimpleScenario.scenario(6, SimpleScenario.putCasGetClient)
+    SimulationResultSingleton.getInstance()
+
+    val range = 20 to 30;
+    SimulationResult += ("pcgTest" -> "20-30");
+    simpleBootScenario.simulate(classOf[LauncherComp]);
+    for (i <- range) {
+      SimulationResult.get[String]("PUT CAS GET:"+i.toString).get shouldBe
+      // for CAS odd numbers will be swapped to 10x of previous  
+      (if (i%2 == 0) i.toString else (10*i).toString)
+    }
+  }
+
 }
 
 object SimpleScenario {
@@ -113,13 +130,23 @@ object SimpleScenario {
     StartNode(selfAddr, Init.none[KeyGetTest], conf);
   }
 
+
+  val putCasGetClient = Op { self: Integer =>
+    val selfAddr = intToClientAddress(self)
+    val conf = Map(
+      "id2203.project.address" -> selfAddr,
+      "id2203.project.bootstrap-address" -> intToServerAddress(1))
+    StartNode(selfAddr, Init.none[PutCasGetTestClient], conf);
+  }
+
   def scenario(servers: Int, cl: Operation1[StartNodeEvent, Integer]): JSimulationScenario = {
-    val networkSetup = raise(1, setUniformLatencyNetwork()).arrival(constant(0));
+    // val networkSetup = raise(1, setUniformLatencyNetwork()).arrival(constant(0));
     val startCluster = raise(servers, startServerOp, 1.toN).arrival(constant(1.second))
     val startClients = raise(1, cl, 1.toN).arrival(constant(1.second))
 
-    networkSetup andThen
-      0.seconds afterTermination startCluster andThen
+    // networkSetup andThen
+      // 0.seconds afterTermination 
+      startCluster andThen
       10.seconds afterTermination startClients andThen
       100.seconds afterTermination Terminate
   }
