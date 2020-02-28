@@ -37,8 +37,8 @@ import collection.mutable
 class PutCasGetTestClient extends ComponentDefinition {
 
   //******* Ports ******
-  val net: PositivePort[Network] = requires[Network]
-  val timer: PositivePort[Timer] = requires[Timer]
+  val net = requires[Network]
+  val timer = requires[Timer]
   //******* Fields ******
   val self: NetAddress = cfg.getValue[NetAddress]("id2203.project.address")
   val server: NetAddress = cfg.getValue[NetAddress]("id2203.project.bootstrap-address")

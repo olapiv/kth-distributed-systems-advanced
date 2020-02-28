@@ -73,6 +73,20 @@ class OpsTest extends FlatSpec with Matchers {
     }
   }
 
+  "KV-store" should "work with 1 failed server" in {
+    val seed = 123L;
+    JSimulationScenario.setSeed(seed);
+    val simpleBootScenario = SimpleScenario.scenario(6, SimpleScenario.crashClient);
+    SimulationResultSingleton.getInstance();
+
+    val range = 30 to 40;
+    SimulationResult += ("failNodeTest" -> "30-40")
+    simpleBootScenario.simulate(classOf[LauncherComp])
+    for (i <- range) {
+      SimulationResult.get[String]("PUT GET:"+i.toString).get shouldBe i.toString
+    }
+  }
+
 }
 
 object SimpleScenario {
@@ -130,13 +144,20 @@ object SimpleScenario {
     StartNode(selfAddr, Init.none[KeyGetTest], conf);
   }
 
-
   val putCasGetClient = Op { self: Integer =>
     val selfAddr = intToClientAddress(self)
     val conf = Map(
       "id2203.project.address" -> selfAddr,
       "id2203.project.bootstrap-address" -> intToServerAddress(1))
     StartNode(selfAddr, Init.none[PutCasGetTestClient], conf);
+  }
+
+  val crashClient = Op { self: Integer =>
+    val selfAddr = intToClientAddress(self)
+    val conf = Map(
+      "id2203.project.address" -> selfAddr,
+      "id2203.project.bootstrap-address" -> intToServerAddress(1))
+    StartNode(selfAddr, Init.none[FailNodeTest], conf);
   }
 
   def scenario(servers: Int, cl: Operation1[StartNodeEvent, Integer]): JSimulationScenario = {

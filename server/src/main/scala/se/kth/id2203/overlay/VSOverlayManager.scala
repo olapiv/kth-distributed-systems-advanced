@@ -99,6 +99,18 @@ class VSOverlayManager extends ComponentDefinition {
   }
 
   net uponEvent {
+
+    // Specific case for automated testing for killing a server node
+    case NetMessage(header, RouteMsg(killCmd, dm: Get)) if killCmd startsWith "KILL:" => {
+      val key = killCmd.replace("KILL:", "")
+      val partIterator = lut.get.lookup(key).iterator
+      var addr: Option[NetAddress] = None
+      do {
+        addr = Some(partIterator.next())
+      } while (addr.contains(self))
+      trigger(NetMessage(header.src, addr.get, Get("Suicide", dm.source)) -> net)
+    }
+
     case NetMessage(_, RouteMsg(key, msg: Op)) => {
       val nodes = lut.get.lookup(key).toSet
       trigger(BEB_Topology(nodes) -> beb);
@@ -116,6 +128,8 @@ class VSOverlayManager extends ComponentDefinition {
       }
     }
   }
+
+
 
   route uponEvent {
     case RouteMsg(key, msg) => {

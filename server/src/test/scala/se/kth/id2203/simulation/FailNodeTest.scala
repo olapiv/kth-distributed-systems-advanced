@@ -30,11 +30,11 @@ import se.kth.id2203.overlay.RouteMsg
 import se.sics.kompics.sl._
 import se.sics.kompics.Start
 import se.sics.kompics.network.Network
+import collection.mutable
 import se.sics.kompics.timer.Timer
 import se.sics.kompics.sl.simulator.SimulationResult
-import collection.mutable
 
-class KeyGetTest extends ComponentDefinition {
+class FailNodeTest extends ComponentDefinition {
 
   //******* Ports ******
   val net = requires[Network]
@@ -46,22 +46,31 @@ class KeyGetTest extends ComponentDefinition {
   //******* Handlers ******
   ctrl uponEvent {
     case _: Start => {
-      val messages = SimulationResult[Int]("getKeyTest")
-      for (i <- 0 to messages) {
-        val op = Get(i.toString, self)
-        val routeMsg = RouteMsg(op.key, op) // don't know which partition is responsible, so ask the bootstrap server to forward it
+      val range = SimulationResult[String]("failNodeTest")
+      val boundaries = range.split('-')
+      for (value <- boundaries(0).toInt to boundaries(1).toInt){
+        val put = Put(value.toString, value.toString, self)
+        val putMsg = RouteMsg(put.key, put)
+        trigger(NetMessage(self, server, putMsg) -> net)
+
+        //kills a server by sending a specific KILL command
+        val killOp = Get("KILL:"+value, self)
+        val routeMsg = RouteMsg(killOp.key, killOp)
         trigger(NetMessage(self, server, routeMsg) -> net)
-        pending += (op.id -> op.key)
+
+        val get = Get(value.toString, self)
+        val getMsg = RouteMsg(get.key, get)
+        trigger(NetMessage(self, server, getMsg) -> net)
+        pending += (get.id -> get.key)
+
       }
     }
   }
 
   net uponEvent {
-    case NetMessage(_, OpResponse(id, _, value)) => {
-      pending.remove(id) match {
-        case Some(key) => SimulationResult += ("message" + key -> value.get);
-        case None => logger.warn("ID $id was not pending! Ignoring response.");
-      }
+    case NetMessage(_, OpResponse(id, _, value))if pending contains id => {
+      val resKey = pending(id)
+      SimulationResult += ("PUT GET:" + resKey -> value.get)
     }
   }
 }
