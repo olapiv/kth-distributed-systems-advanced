@@ -47,13 +47,13 @@ class OpsTest extends FlatSpec with Matchers {
   "Get operation with <key>=[0,10]" should "return values that are equal to 100+<key>" in {
     val seed = 123L;
     JSimulationScenario.setSeed(seed)
-    // val simpleBootScenario = SimpleScenario.scenario(6, SimpleScenario.defaultValueClient)
-    val simpleBootScenario = SimpleScenario.scenario(6, SimpleScenario.defaultValueClient)
-    SimulationResultSingleton.getInstance()
-    SimulationResult += ("debugCode1" -> nMessages)
-    simpleBootScenario.simulate(classOf[LauncherComp])
+    // val simpleBootScenario = SimpleScenario.scenario(6, SimpleScenario.defaultValueClient);
+    val simpleBootScenario = SimpleScenario.scenario(6, SimpleScenario.defaultValueClient);
+    SimulationResultSingleton.getInstance();
+    SimulationResult += ("getKeyTest" -> nMessages);
+    simpleBootScenario.simulate(classOf[LauncherComp]);
     for (i <- 0 to nMessages) {
-      SimulationResult.get[String]("message"+i.toString).get shouldBe (100+i).toString
+      SimulationResult.get[String]("message"+i.toString).get shouldBe (100+i).toString;
     }
   }
 }
@@ -110,8 +110,7 @@ object SimpleScenario {
     val conf = Map(
       "id2203.project.address" -> selfAddr,
       "id2203.project.bootstrap-address" -> intToServerAddress(1))
-    // StartNode(selfAddr, Init.none[DefaultValueTestClient], conf);
-    StartNode(selfAddr, Init.none[DefaultValueTestClient], conf);
+    StartNode(selfAddr, Init.none[KeyGetTest], conf);
   }
 
   def scenario(servers: Int, cl: Operation1[StartNodeEvent, Integer]): JSimulationScenario = {

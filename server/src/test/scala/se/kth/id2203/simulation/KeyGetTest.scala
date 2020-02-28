@@ -34,7 +34,7 @@ import se.sics.kompics.timer.Timer
 import se.sics.kompics.sl.simulator.SimulationResult
 import collection.mutable
 
-class DefaultValueTestClient extends ComponentDefinition {
+class KeyGetTest extends ComponentDefinition {
 
   //******* Ports ******
   val net: PositivePort[Network] = requires[Network]
@@ -46,7 +46,7 @@ class DefaultValueTestClient extends ComponentDefinition {
   //******* Handlers ******
   ctrl uponEvent {
     case _: Start => {
-      val messages = SimulationResult[Int]("debugCode1")
+      val messages = SimulationResult[Int]("getKeyTest")
       for (i <- 0 to messages) {
         val op = Get(i.toString, self)
         val routeMsg = RouteMsg(op.key, op) // don't know which partition is responsible, so ask the bootstrap server to forward it
