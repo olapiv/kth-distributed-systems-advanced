@@ -71,7 +71,7 @@ class ClientConsole(val service: ClientService) extends CommandConsole with Pars
   val casParser = new ParsingObject[(String, String, String)] {
     override def parseOperation[_: P]: P[(String, String, String)] = P("CAS" ~ " " ~ simpleStr.! ~ " " ~ simpleStr.! ~ " " ~ simpleStr.!);
   }
-  val casCommand = parsed(casParser, usage = "CAS <key> <value> <referenceValue>", descr = "Puts a <value> at a <key> if current value is <referenceValue>") { parse =>
+  val casCommand = parsed(casParser, usage = "CAS <key> <referenceValue> <value>", descr = "Puts a <value> at a <key> if current value is <referenceValue>") { parse =>
     val (key, value, referenceValue) = parse
     println(s"CAS value $value to key $key if current value is $referenceValue");
     val response = runOp(Cas(key, referenceValue, value, service.self))
