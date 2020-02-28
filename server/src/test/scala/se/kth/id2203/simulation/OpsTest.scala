@@ -28,6 +28,10 @@ import se.kth.id2203.ParentComponent;
 import se.kth.id2203.networking._;
 import se.sics.kompics.network.Address
 import java.net.{ InetAddress, UnknownHostException };
+
+import se.sics.kompics.simulator.adaptor.Operation1
+import se.sics.kompics.simulator.events.system.StartNodeEvent
+
 import se.sics.kompics.sl._;
 import se.sics.kompics.sl.simulator._;
 import se.sics.kompics.simulator.{ SimulationScenario => JSimulationScenario }
@@ -40,36 +44,18 @@ class OpsTest extends FlatSpec with Matchers {
 
   private val nMessages = 10;
 
-  //  "Classloader" should "be something" in {
-  //    val cname = classOf[SimulationResultSingleton].getCanonicalName();
-  //    var cl = classOf[SimulationResultSingleton].getClassLoader;
-  //    var i = 0;
-  //    while (cl != null) {
-  //      val res = try {
-  //        val c = cl.loadClass(cname);
-  //        true
-  //      } catch {
-  //        case t: Throwable => false
-  //      }
-  //      println(s"$i -> ${cl.getClass.getName} has class? $res");
-  //      cl = cl.getParent();
-  //      i -= 1;
-  //    }
-  //  }
-
-  "Simple Operations" should "not be implemented" in { // well of course eventually they should be implemented^^
-//    val seed = 123l;
-//    JSimulationScenario.setSeed(seed);
-//    val simpleBootScenario = SimpleScenario.scenario(3);
-//    val res = SimulationResultSingleton.getInstance();
-//    SimulationResult += ("messages" -> nMessages);
-//    simpleBootScenario.simulate(classOf[LauncherComp]);
-//    for (i <- 0 to nMessages) {
-//      SimulationResult.get[String](s"test$i") should be (Some("NotImplemented"));
-//      // of course the correct response should be Success not NotImplemented, but like this the test passes
-//    }
+  "Get operation with <key>=[0,10]" should "return values that are equal to 100+<key>" in {
+    val seed = 123L;
+    JSimulationScenario.setSeed(seed)
+    // val simpleBootScenario = SimpleScenario.scenario(6, SimpleScenario.defaultValueClient)
+    val simpleBootScenario = SimpleScenario.scenario(6, SimpleScenario.defaultValueClient)
+    SimulationResultSingleton.getInstance()
+    SimulationResult += ("debugCode1" -> nMessages)
+    simpleBootScenario.simulate(classOf[LauncherComp])
+    for (i <- 0 to nMessages) {
+      SimulationResult.get[String]("message"+i.toString).get shouldBe (100+i).toString
+    }
   }
-
 }
 
 object SimpleScenario {
@@ -119,11 +105,19 @@ object SimpleScenario {
     StartNode(selfAddr, Init.none[ScenarioClient], conf);
   };
 
-  def scenario(servers: Int): JSimulationScenario = {
+  val defaultValueClient = Op { self: Integer =>
+    val selfAddr = intToClientAddress(self)
+    val conf = Map(
+      "id2203.project.address" -> selfAddr,
+      "id2203.project.bootstrap-address" -> intToServerAddress(1))
+    // StartNode(selfAddr, Init.none[DefaultValueTestClient], conf);
+    StartNode(selfAddr, Init.none[DefaultValueTestClient], conf);
+  }
 
+  def scenario(servers: Int, cl: Operation1[StartNodeEvent, Integer]): JSimulationScenario = {
     val networkSetup = raise(1, setUniformLatencyNetwork()).arrival(constant(0));
-    val startCluster = raise(servers, startServerOp, 1.toN).arrival(constant(1.second));
-    val startClients = raise(1, startClientOp, 1.toN).arrival(constant(1.second));
+    val startCluster = raise(servers, startServerOp, 1.toN).arrival(constant(1.second))
+    val startClients = raise(1, cl, 1.toN).arrival(constant(1.second))
 
     networkSetup andThen
       0.seconds afterTermination startCluster andThen
